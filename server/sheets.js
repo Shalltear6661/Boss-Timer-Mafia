@@ -4,9 +4,9 @@
  */
 
 export function getSheetsConfig(env = process.env) {
-  const apiKey = env.GOOGLE_SHEETS_API_KEY
-  const spreadsheetId = env.GOOGLE_SHEETS_ID || '1WL21q_xEAqmt6TQ15zvobC-Ui5vEUxvjMIKDf_1o3Q8'
-  const sheetName = env.GOOGLE_SHEETS_NAME || 'BOSS Timer'
+  const apiKey = env['GOOGLE_SHEETS_API_KEY'] || env['GOOGLE_API_KEY'] || ''
+  const spreadsheetId = env['GOOGLE_SHEETS_ID'] || '1WL21q_xEAqmt6TQ15zvobC-Ui5vEUxvjMIKDf_1o3Q8'
+  const sheetName = env['GOOGLE_SHEETS_NAME'] || 'BOSS Timer'
   return { apiKey, spreadsheetId, sheetName }
 }
 
