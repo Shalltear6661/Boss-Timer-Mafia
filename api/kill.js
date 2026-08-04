@@ -52,14 +52,19 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ ok: true, ...result, by: session.email }))
   } catch (e) {
     console.error('[api/kill]', e?.message || e)
-    res.statusCode = e?.code === 'MISSING_OAUTH' || e?.code === 'OAUTH_REFRESH_FAILED' ? 500 : 400
+    const setupFail = ['MISSING_WRITE_CREDS', 'MISSING_SA', 'SA_KEY_INVALID', 'SA_TOKEN_FAILED', 'MISSING_OAUTH', 'OAUTH_REFRESH_FAILED'].includes(
+      e?.code
+    )
+    res.statusCode = setupFail ? 500 : 400
     res.end(
       JSON.stringify({
         error: e?.message || 'Gagal update spreadsheet',
         hint:
-          e?.code === 'MISSING_OAUTH'
-            ? 'Set GOOGLE_OAUTH_* refresh token di Vercel untuk menulis ke sheet'
-            : undefined,
+          e?.code === 'MISSING_WRITE_CREDS' || e?.code === 'MISSING_SA'
+            ? 'Set Service Account di Vercel + share spreadsheet ke email SA (Editor)'
+            : e?.code === 'SA_TOKEN_FAILED'
+              ? 'Cek private key SA / pastikan Google Sheets API enabled'
+              : undefined,
       })
     )
   }

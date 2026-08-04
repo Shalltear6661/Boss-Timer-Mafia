@@ -45,7 +45,9 @@ function sheetsApiPlugin(env) {
         const action = parsed.searchParams.get('action') || (req.method === 'GET' ? 'me' : '')
 
         if (req.method === 'GET' && action === 'config') {
-          sendJson(res, 200, { clientId: env.GOOGLE_OAUTH_CLIENT_ID || '' })
+          sendJson(res, 200, {
+            clientId: env['GOOGLE_OAUTH_CLIENT_ID'] || process.env['GOOGLE_OAUTH_CLIENT_ID'] || '',
+          })
           return
         }
 
@@ -164,7 +166,13 @@ function sheetsApiPlugin(env) {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // Client ID bersifat publik — inject ke frontend supaya tombol login
+  // tidak bergantung hanya pada /api/auth (dan ikut ter-update saat rebuild).
+  const googleClientId = env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_ID || ''
   return {
-    plugins: [svelte(), sheetsApiPlugin(env)],
+    define: {
+      __GOOGLE_OAUTH_CLIENT_ID__: JSON.stringify(googleClientId),
+    },
+    plugins: [svelte(), sheetsApiPlugin({ ...env, GOOGLE_OAUTH_CLIENT_ID: googleClientId })],
   }
 })

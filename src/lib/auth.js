@@ -1,7 +1,16 @@
+const embeddedClientId =
+  typeof __GOOGLE_OAUTH_CLIENT_ID__ !== 'undefined' ? __GOOGLE_OAUTH_CLIENT_ID__ : ''
+
 export async function getAuthConfig() {
+  // Utama: nilai yang di-inject Vite dari GOOGLE_OAUTH_CLIENT_ID saat dev/build
+  if (embeddedClientId) {
+    return { clientId: embeddedClientId }
+  }
+  // Fallback: dari API server (Vercel runtime / proxy)
   const res = await fetch('/api/auth?action=config')
   if (!res.ok) throw new Error('Gagal load auth config')
-  return res.json()
+  const data = await res.json()
+  return { clientId: data.clientId || '' }
 }
 
 export async function fetchMe() {

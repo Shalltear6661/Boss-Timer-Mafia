@@ -1,5 +1,5 @@
 <script>
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, tick } from 'svelte'
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
@@ -20,6 +20,8 @@
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v2'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
+  // Set true lagi setelah Service Account siap
+  const ENABLE_MARK_KILLED = false
 
   let bosses = []
   let weeklyBossesList = []
@@ -39,7 +41,7 @@
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
 
-  $: canEdit = !!user.canEdit
+  $: canEdit = ENABLE_MARK_KILLED && !!user.canEdit
 
   function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -157,16 +159,22 @@
 
   async function initAuth() {
     try {
-      await refreshUser()
-      const { clientId } = await getAuthConfig()
-      googleClientId = clientId || ''
+      // Paralel: session + clientId + script GSI (jangan serial biar tombol login cepat muncul)
+      const [me, cfg] = await Promise.all([
+        fetchMe().catch(() => ({ authenticated: false, canEdit: false })),
+        getAuthConfig().catch(() => ({ clientId: '' })),
+        loadGoogleScript().catch(() => {}),
+      ])
+      user = me
+      googleClientId = (cfg.clientId || '').trim()
       if (googleClientId) {
-        await loadGoogleScript()
+        await tick()
         if (googleBtnEl && !user.authenticated) {
           renderGoogleButton(googleBtnEl, googleClientId, handleGoogleCredential)
         }
       } else {
-        authError = 'GOOGLE_OAUTH_CLIENT_ID belum di-set di .env / Vercel'
+        authError =
+          'GOOGLE_OAUTH_CLIENT_ID belum di-set di .env / Vercel (atau server belum di-restart/redeploy)'
       }
     } catch (e) {
       console.warn('Auth init:', e)
@@ -176,8 +184,10 @@
     }
   }
 
-  $: if (authReady && googleBtnEl && googleClientId && !user.authenticated) {
-    renderGoogleButton(googleBtnEl, googleClientId, handleGoogleCredential)
+  $: if (ENABLE_MARK_KILLED && authReady && googleBtnEl && googleClientId && !user.authenticated) {
+    loadGoogleScript()
+      .then(() => renderGoogleButton(googleBtnEl, googleClientId, handleGoogleCredential))
+      .catch(() => {})
   }
 
   $: sortedBosses = [...bosses].sort((a, b) => {
@@ -244,7 +254,8 @@
 
   onMount(async () => {
     load()
-    initAuth()
+    if (ENABLE_MARK_KILLED) initAuth()
+    else authReady = true
     notifEnabled = isNotificationGranted()
     const unlockOnce = () => {
       unlockAudio()
@@ -271,13 +282,7 @@
       <span class="brand-mark">◈</span>
       <div>
         <h1>Mafia Timer</h1>
-        <p class="tagline">
-          {#if user.authenticated}
-            {canEdit ? 'Editor · bisa Tandai Mati' : 'View-only · login sebagai Editor untuk update'}
-          {:else}
-            Login Google untuk role Editor / view-only
-          {/if}
-        </p>
+        <p class="tagline">Timer respawn dari spreadsheet</p>
       </div>
     </div>
     <div class="header-right">
@@ -285,26 +290,28 @@
         <div class="clock-time">{now.toLocaleTimeString('id-ID', { hour12: false })}</div>
         <div class="clock-date">{now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
       </div>
-      <div class="auth-box">
-        {#if user.authenticated}
-          <div class="user-chip" class:editor={canEdit}>
-            {#if user.picture}
-              <img src={user.picture} alt="" class="avatar" />
-            {/if}
-            <div class="user-meta">
-              <span class="user-name">{user.name || user.email}</span>
-              <span class="user-role">{canEdit ? 'Editor' : 'View-only'}</span>
+      {#if ENABLE_MARK_KILLED}
+        <div class="auth-box">
+          {#if user.authenticated}
+            <div class="user-chip" class:editor={canEdit}>
+              {#if user.picture}
+                <img src={user.picture} alt="" class="avatar" />
+              {/if}
+              <div class="user-meta">
+                <span class="user-name">{user.name || user.email}</span>
+                <span class="user-role">{canEdit ? 'Editor' : 'View-only'}</span>
+              </div>
+              <button class="logout-btn" on:click={handleLogout}>Keluar</button>
             </div>
-            <button class="logout-btn" on:click={handleLogout}>Keluar</button>
-          </div>
-        {:else if googleClientId}
-          <div class="google-btn" bind:this={googleBtnEl}></div>
-        {:else}
-          <div class="login-placeholder" title={authError || 'Set GOOGLE_OAUTH_CLIENT_ID'}>
-            Login belum siap
-          </div>
-        {/if}
-      </div>
+          {:else if googleClientId}
+            <div class="google-btn" bind:this={googleBtnEl}></div>
+          {:else}
+            <div class="login-placeholder" title={authError || 'Set GOOGLE_OAUTH_CLIENT_ID'}>
+              Login belum siap
+            </div>
+          {/if}
+        </div>
+      {/if}
       <button
         class="spreadsheet-status"
         class:live={spreadsheetStatus === 'live'}
@@ -357,7 +364,7 @@
     <div class="kill-error">{killError}</div>
   {/if}
 
-  {#if !user.authenticated}
+  {#if ENABLE_MARK_KILLED && !user.authenticated}
     <div class="role-banner">
       {#if googleClientId}
         Tombol <strong>Sign in with Google</strong> ada di kanan atas (sebelah jam). Login sebagai Editor untuk Tandai Mati.
@@ -366,7 +373,7 @@
         Buat OAuth Client tipe <strong>Web application</strong>, isi Client ID, restart dev server / Redeploy.
       {/if}
     </div>
-  {:else if !canEdit}
+  {:else if ENABLE_MARK_KILLED && !canEdit}
     <div class="role-banner view">
       Anda login sebagai <strong>{user.email}</strong> (view-only). Hubungi admin untuk ditambahkan ke daftar Editor.
     </div>
@@ -419,7 +426,7 @@
 
   <footer>
     <p class="footer-note">
-      Editor (email di EDITOR_EMAILS) bisa Tandai Mati ke spreadsheet. Lainnya view-only.
+      Data dari Google Spreadsheet. Update waktu kematian di sheet; app sync otomatis tiap menit.
     </p>
     <button class="link" on:click={refreshFromSpreadsheet} disabled={syncing}>
       {syncing ? 'Menyinkronkan...' : 'Refresh data sekarang'}

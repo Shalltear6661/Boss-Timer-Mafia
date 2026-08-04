@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "auth:google": "node scripts/get-refresh-token.mjs"
+    "auth:google": "node scripts/get-refresh-token.mjs",
+    "sa:env": "node scripts/sa-to-env.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.1",
