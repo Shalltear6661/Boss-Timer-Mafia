@@ -1,6 +1,9 @@
 <script>
   export let boss
   export let now
+  export let onMarkKilled = null
+  export let killing = false
+  export let showKill = false
 
   $: nextSpawn = boss.lastDeath.getTime() + boss.spawnIntervalHours * 3600 * 1000
   $: msLeft = nextSpawn - now.getTime()
@@ -34,6 +37,13 @@
     <span>Interval {boss.spawnIntervalHours}j</span>
     <span>Next {formatClock(new Date(nextSpawn))}</span>
   </div>
+  {#if showKill && onMarkKilled}
+  <div class="actions">
+    <button class="primary" disabled={killing} on:click={() => onMarkKilled(boss)}>
+      {killing ? 'Menyimpan...' : 'Tandai Mati'}
+    </button>
+  </div>
+  {/if}
 </article>
 
 <style>
@@ -89,5 +99,30 @@
     justify-content: space-between;
     font-size: 11.5px;
     color: #8a8aa0;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  button {
+    flex: 1;
+    padding: 7px 8px;
+    border-radius: 7px;
+    font-size: 12px;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+  .primary {
+    background: #3a3a52;
+    color: #eee;
+  }
+  .primary:hover:not(:disabled) {
+    background: #47476a;
   }
 </style>

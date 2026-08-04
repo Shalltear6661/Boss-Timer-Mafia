@@ -13,6 +13,21 @@ async function fetchRange(range) {
   return data.values || []
 }
 
+/** Tandai boss mati → update Time of Death di spreadsheet (OAuth akun pribadi) */
+export async function markBossKilled(name) {
+  const res = await fetch('/api/kill', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || `Gagal update kill: ${res.status}`)
+  }
+  return data
+}
+
 /**
  * Parse tanggal format "DD/MM/YYYY HH:mm" (WIB) menjadi ISO string +07:00.
  * Contoh: "03/08/2026 11:56" → "2026-08-03T11:56:00+07:00"

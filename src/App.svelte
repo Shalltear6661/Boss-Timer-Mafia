@@ -2,8 +2,16 @@
   import { onMount, onDestroy } from 'svelte'
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
-  import { fetchIntervalBosses, fetchWeeklyBosses } from './lib/spreadsheet.js'
+  import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
   import { ensureNotificationPermission, checkAndNotify, unlockAudio, isNotificationGranted } from './lib/notifications.js'
+  import {
+    getAuthConfig,
+    fetchMe,
+    loginWithCredential,
+    logout as apiLogout,
+    loadGoogleScript,
+    renderGoogleButton,
+  } from './lib/auth.js'
   import BossCard from './lib/BossCard.svelte'
   import WeeklyCard from './lib/WeeklyCard.svelte'
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
@@ -20,9 +28,18 @@
   let syncInterval
   let spreadsheetStatus = 'loading' // 'loading' | 'live' | 'cache'
   let syncing = false
+  let killingId = null
+  let killError = ''
+  let user = { authenticated: false, canEdit: false, email: '', name: '', picture: '' }
+  let authReady = false
+  let googleClientId = ''
+  let googleBtnEl
+  let authError = ''
   let notifSupported = typeof Notification !== 'undefined'
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+
+  $: canEdit = !!user.canEdit
 
   function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -50,8 +67,8 @@
     }
   }
 
-  // Ambil data terbaru dari Google Spreadsheet (view-only).
-  // Update data dilakukan di spreadsheet, bukan di aplikasi.
+  // Ambil data terbaru dari Google Spreadsheet.
+  // Kill di web akan menulis Time of Death ke spreadsheet (OAuth akun pribadi).
   async function syncFromSpreadsheet() {
     if (syncing) return
     syncing = true
@@ -97,6 +114,70 @@
   async function refreshFromSpreadsheet() {
     spreadsheetStatus = 'loading'
     await syncFromSpreadsheet()
+  }
+
+  async function markKilled(boss) {
+    if (!canEdit) {
+      killError = 'Login sebagai Editor untuk menandai mati'
+      return
+    }
+    if (!boss?.name || killingId) return
+    killingId = boss.id
+    killError = ''
+    try {
+      await markBossKilled(boss.name)
+      bosses = bosses.map((b) => (b.id === boss.id ? { ...b, lastDeath: new Date() } : b))
+      persist()
+      await syncFromSpreadsheet()
+    } catch (e) {
+      console.error(e)
+      killError = e.message || 'Gagal menyimpan ke spreadsheet'
+    } finally {
+      killingId = null
+    }
+  }
+
+  async function refreshUser() {
+    user = await fetchMe()
+  }
+
+  async function handleGoogleCredential(credential) {
+    try {
+      user = await loginWithCredential(credential)
+      killError = ''
+    } catch (e) {
+      killError = e.message || 'Login gagal'
+    }
+  }
+
+  async function handleLogout() {
+    await apiLogout()
+    user = { authenticated: false, canEdit: false, email: '', name: '', picture: '' }
+  }
+
+  async function initAuth() {
+    try {
+      await refreshUser()
+      const { clientId } = await getAuthConfig()
+      googleClientId = clientId || ''
+      if (googleClientId) {
+        await loadGoogleScript()
+        if (googleBtnEl && !user.authenticated) {
+          renderGoogleButton(googleBtnEl, googleClientId, handleGoogleCredential)
+        }
+      } else {
+        authError = 'GOOGLE_OAUTH_CLIENT_ID belum di-set di .env / Vercel'
+      }
+    } catch (e) {
+      console.warn('Auth init:', e)
+      authError = e.message || 'Gagal init login'
+    } finally {
+      authReady = true
+    }
+  }
+
+  $: if (authReady && googleBtnEl && googleClientId && !user.authenticated) {
+    renderGoogleButton(googleBtnEl, googleClientId, handleGoogleCredential)
   }
 
   $: sortedBosses = [...bosses].sort((a, b) => {
@@ -163,7 +244,7 @@
 
   onMount(async () => {
     load()
-    // Sync status permission (jangan await unlockAudio di sini — bisa menggantung tanpa gesture)
+    initAuth()
     notifEnabled = isNotificationGranted()
     const unlockOnce = () => {
       unlockAudio()
@@ -190,13 +271,39 @@
       <span class="brand-mark">◈</span>
       <div>
         <h1>Mafia Timer</h1>
-        <p class="tagline">View-only · data dari spreadsheet</p>
+        <p class="tagline">
+          {#if user.authenticated}
+            {canEdit ? 'Editor · bisa Tandai Mati' : 'View-only · login sebagai Editor untuk update'}
+          {:else}
+            Login Google untuk role Editor / view-only
+          {/if}
+        </p>
       </div>
     </div>
     <div class="header-right">
       <div class="clock">
         <div class="clock-time">{now.toLocaleTimeString('id-ID', { hour12: false })}</div>
         <div class="clock-date">{now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+      </div>
+      <div class="auth-box">
+        {#if user.authenticated}
+          <div class="user-chip" class:editor={canEdit}>
+            {#if user.picture}
+              <img src={user.picture} alt="" class="avatar" />
+            {/if}
+            <div class="user-meta">
+              <span class="user-name">{user.name || user.email}</span>
+              <span class="user-role">{canEdit ? 'Editor' : 'View-only'}</span>
+            </div>
+            <button class="logout-btn" on:click={handleLogout}>Keluar</button>
+          </div>
+        {:else if googleClientId}
+          <div class="google-btn" bind:this={googleBtnEl}></div>
+        {:else}
+          <div class="login-placeholder" title={authError || 'Set GOOGLE_OAUTH_CLIENT_ID'}>
+            Login belum siap
+          </div>
+        {/if}
       </div>
       <button
         class="spreadsheet-status"
@@ -229,10 +336,40 @@
       </div>
       <div class="hero-grid">
         {#each soonList as b (b.id)}
-          <SpawnSoonCard name={b.name} meta={b.meta} msLeft={b.msLeft} isUp={b.isUp} />
+          <SpawnSoonCard
+            name={b.name}
+            meta={b.meta}
+            msLeft={b.msLeft}
+            isUp={b.isUp}
+            canMarkKilled={canEdit && b.type === 'interval'}
+            killing={killingId === b.sourceId}
+            onMarkKilled={() => {
+              const boss = bosses.find((x) => x.id === b.sourceId)
+              if (boss) markKilled(boss)
+            }}
+          />
         {/each}
       </div>
     </section>
+  {/if}
+
+  {#if killError}
+    <div class="kill-error">{killError}</div>
+  {/if}
+
+  {#if !user.authenticated}
+    <div class="role-banner">
+      {#if googleClientId}
+        Tombol <strong>Sign in with Google</strong> ada di kanan atas (sebelah jam). Login sebagai Editor untuk Tandai Mati.
+      {:else}
+        Tombol login belum muncul karena <code>GOOGLE_OAUTH_CLIENT_ID</code> masih kosong di <code>.env</code> / Vercel.
+        Buat OAuth Client tipe <strong>Web application</strong>, isi Client ID, restart dev server / Redeploy.
+      {/if}
+    </div>
+  {:else if !canEdit}
+    <div class="role-banner view">
+      Anda login sebagai <strong>{user.email}</strong> (view-only). Hubungi admin untuk ditambahkan ke daftar Editor.
+    </div>
   {/if}
 
   {#if !notifEnabled && notifSupported}
@@ -255,7 +392,13 @@
     {:else}
       <div class="card-grid">
         {#each remainingBosses as boss (boss.id)}
-          <BossCard {boss} {now} />
+          <BossCard
+            {boss}
+            {now}
+            onMarkKilled={canEdit ? markKilled : null}
+            killing={killingId === boss.id}
+            showKill={canEdit}
+          />
         {/each}
       </div>
     {/if}
@@ -275,7 +418,9 @@
   </section>
 
   <footer>
-    <p class="footer-note">Update waktu kematian dilakukan di Google Spreadsheet. Aplikasi ini hanya menampilkan countdown.</p>
+    <p class="footer-note">
+      Editor (email di EDITOR_EMAILS) bisa Tandai Mati ke spreadsheet. Lainnya view-only.
+    </p>
     <button class="link" on:click={refreshFromSpreadsheet} disabled={syncing}>
       {syncing ? 'Menyinkronkan...' : 'Refresh data sekarang'}
     </button>
@@ -341,6 +486,91 @@
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
+  }
+  .auth-box {
+    display: flex;
+    align-items: center;
+  }
+  .user-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px 4px 4px;
+    border-radius: 999px;
+    background: #181825;
+    border: 1px solid #2a2a38;
+  }
+  .user-chip.editor {
+    border-color: #2a6a3a;
+  }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .user-meta {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+    max-width: 140px;
+  }
+  .user-name {
+    font-size: 11px;
+    color: #ddd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .user-role {
+    font-size: 10px;
+    color: #8a8aa0;
+  }
+  .user-chip.editor .user-role {
+    color: #7fc88a;
+  }
+  .logout-btn {
+    background: transparent;
+    border: 1px solid #3a3a52;
+    color: #aaa;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .logout-btn:hover {
+    border-color: #666;
+    color: #eee;
+  }
+  .google-btn {
+    min-height: 32px;
+    min-width: 180px;
+  }
+  .login-placeholder {
+    font-size: 11px;
+    color: #c8b87f;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px dashed #6a5a2a;
+    background: rgba(240, 180, 40, 0.08);
+  }
+  .role-banner code {
+    font-size: 12px;
+    color: #e8e0ff;
+  }
+  .role-banner {
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(106, 90, 205, 0.12);
+    border: 1px solid rgba(106, 90, 205, 0.35);
+    color: #c8c0e8;
+    font-size: 13px;
+  }
+  .role-banner.view {
+    background: rgba(240, 180, 40, 0.08);
+    border-color: rgba(240, 180, 40, 0.3);
+    color: #c8b87f;
   }
   .clock-time {
     font-family: 'JetBrains Mono', monospace;
@@ -484,6 +714,15 @@
     margin: 0;
     font-size: 13px;
     color: #6a6a80;
+  }
+  .kill-error {
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(224, 72, 60, 0.12);
+    border: 1px solid rgba(224, 72, 60, 0.4);
+    color: #ff8478;
+    font-size: 13px;
   }
 
   .section-title {

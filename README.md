@@ -1,47 +1,38 @@
 # Boss Timer
 
-Timer respawn boss (Svelte + Vite). Data dari Google Spreadsheet, view-only.
+Timer respawn boss. Semua orang bisa **lihat**. Hanya email **Editor** yang bisa **Tandai Mati**.
 
-## Cara jalankan (local)
+## Role
 
-1. Copy env:
-   ```bash
-   cp .env.example .env
-   ```
-2. Isi `GOOGLE_SHEETS_API_KEY` di `.env`
-3. Jalankan:
-   ```bash
-   npm install
-   npm run dev
-   ```
-4. Buka http://localhost:5173
+| Status | Bisa lihat | Tandai Mati |
+|--------|------------|------------|
+| Tanpa login | Ya | Tidak |
+| Login, email di `EDITOR_EMAILS` | Ya | Ya |
+| Login, email lain | Ya | Tidak (view-only) |
 
-Browser hanya memanggil `/api/sheets?range=...` — **API key tidak muncul di Network tab**.
+## Setup
 
-## Deploy production (Vercel) — supaya key tetap tersembunyi
+```bash
+cp .env.example .env
+npm install
+```
 
-Hosting static biasa (GitHub Pages, dll.) **tidak cukup**, karena butuh serverless proxy.
+### 1. Google Cloud
 
-1. Push repo ke GitHub
-2. Import project di [Vercel](https://vercel.com)
-3. Di **Settings → Environment Variables**, tambahkan:
-   - `GOOGLE_SHEETS_API_KEY`
-   - `GOOGLE_SHEETS_ID`
-   - `GOOGLE_SHEETS_NAME` (opsional, default `BOSS Timer`)
-4. Deploy
+1. Enable **Google Sheets API**
+2. Buat OAuth Client **Web application**
+   - Authorized JavaScript origins: `http://localhost:5173`, `https://YOUR.vercel.app`
+3. Isi `GOOGLE_OAUTH_CLIENT_ID` (+ secret) di `.env`
+4. Consent screen → tambah Test users (email yang akan login)
+5. Jalankan `npm run auth:google` **sekali** (login sebagai pemilik sheet) → dapat `GOOGLE_OAUTH_REFRESH_TOKEN` untuk menulis ke spreadsheet
+6. Set `EDITOR_EMAILS=emailanda@gmail.com,editor2@gmail.com`
 
-Endpoint production: `https://your-app.vercel.app/api/sheets?range=A2:D`  
-(server yang memanggil Google; key tidak ikut ke browser)
+### 2. Jalankan
 
-### Penting soal keamanan API key
+```bash
+npm run dev
+```
 
-- Key yang pernah ada di frontend / chat **sebaiknya di-rotate** di Google Cloud Console
-- Restrict key ke **Google Sheets API** saja
-- Setelah pakai proxy, batasi juga jika memungkinkan
+### 3. Vercel env
 
-## Fitur
-
-- Sync data dari spreadsheet (auto tiap 1 menit)
-- Hero card sticky untuk boss ≤10 menit / spawn
-- Notifikasi browser + suara di 10 menit, 5 menit, dan spawn
-- View-only (update waktu kematian di spreadsheet)
+`GOOGLE_SHEETS_API_KEY`, `GOOGLE_SHEETS_ID`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`, `EDITOR_EMAILS`, `SESSION_SECRET` → lalu Redeploy.

@@ -5,6 +5,9 @@
   export let meta
   export let msLeft
   export let isUp
+  export let canMarkKilled = false
+  export let onMarkKilled = null
+  export let killing = false
 
   const SOON_WINDOW = 10 * 60 * 1000
 
@@ -40,6 +43,11 @@
       <p class="countdown-big">{formatCountdown(msLeft)}</p>
     {:else}
       <p class="countdown-big spawn-text">SPAWN SEKARANG</p>
+    {/if}
+    {#if canMarkKilled && onMarkKilled}
+      <button class="kill-btn" disabled={killing} on:click={onMarkKilled}>
+        {killing ? 'Menyimpan...' : 'Tandai Mati'}
+      </button>
     {/if}
   </div>
 </article>
@@ -133,5 +141,24 @@
   .spawn-text {
     color: #ff6b6b !important;
     letter-spacing: 0.04em;
+  }
+  .kill-btn {
+    margin-top: 12px;
+    background: #3a3a52;
+    border: none;
+    color: #eee;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .kill-btn:hover:not(:disabled) {
+    background: #47476a;
+  }
+  .kill-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
 </style>
