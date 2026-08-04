@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses } from './lib/spreadsheet.js'
-  import { ensureNotificationPermission, checkAndNotify, unlockAudio } from './lib/notifications.js'
+  import { ensureNotificationPermission, checkAndNotify, unlockAudio, isNotificationGranted } from './lib/notifications.js'
   import BossCard from './lib/BossCard.svelte'
   import WeeklyCard from './lib/WeeklyCard.svelte'
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
@@ -20,8 +20,9 @@
   let syncInterval
   let spreadsheetStatus = 'loading' // 'loading' | 'live' | 'cache'
   let syncing = false
-  let notifEnabled = false
   let notifSupported = typeof Notification !== 'undefined'
+  // Baca permission langsung agar banner tidak muncul lagi setelah refresh
+  let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
 
   function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -162,8 +163,8 @@
 
   onMount(async () => {
     load()
-    notifEnabled = await ensureNotificationPermission()
-    // Browser butuh gesture user sebelum audio boleh diputar
+    // Sync status permission (jangan await unlockAudio di sini — bisa menggantung tanpa gesture)
+    notifEnabled = isNotificationGranted()
     const unlockOnce = () => {
       unlockAudio()
       window.removeEventListener('pointerdown', unlockOnce)

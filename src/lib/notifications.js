@@ -103,13 +103,24 @@ function playAlertSound(milestoneId) {
   }
 }
 
+/** Cek status permission tanpa memicu dialog / audio */
+export function isNotificationGranted() {
+  return typeof Notification !== 'undefined' && Notification.permission === 'granted'
+}
+
+/** Request permission + unlock audio — hanya panggil dari klik user */
 export async function ensureNotificationPermission() {
-  await unlockAudio()
   if (typeof Notification === 'undefined') return false
-  if (Notification.permission === 'granted') return true
-  if (Notification.permission === 'denied') return false
-  const result = await Notification.requestPermission()
-  return result === 'granted'
+
+  let granted = Notification.permission === 'granted'
+  if (!granted && Notification.permission !== 'denied') {
+    const result = await Notification.requestPermission()
+    granted = result === 'granted'
+  }
+
+  // Unlock audio hanya setelah gesture (klik tombol)
+  await unlockAudio()
+  return granted
 }
 
 function markFired(bossId, milestone) {
