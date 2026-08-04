@@ -1,81 +1,47 @@
-# Boss Timer (MVP)
+# Boss Timer
 
-Aplikasi timer boss respawn, dibuat dengan Svelte + Vite.
+Timer respawn boss (Svelte + Vite). Data dari Google Spreadsheet, view-only.
 
-## Cara jalankan
+## Cara jalankan (local)
 
-```bash
-npm install
-npm run dev
-```
+1. Copy env:
+   ```bash
+   cp .env.example .env
+   ```
+2. Isi `GOOGLE_SHEETS_API_KEY` di `.env`
+3. Jalankan:
+   ```bash
+   npm install
+   npm run dev
+   ```
+4. Buka http://localhost:5173
 
-Buka http://localhost:5173
+Browser hanya memanggil `/api/sheets?range=...` — **API key tidak muncul di Network tab**.
 
-## Build untuk produksi
+## Deploy production (Vercel) — supaya key tetap tersembunyi
 
-```bash
-npm run build
-```
+Hosting static biasa (GitHub Pages, dll.) **tidak cukup**, karena butuh serverless proxy.
 
-Hasil build ada di folder `dist/`, tinggal di-host di static hosting mana saja
-(Netlify, Vercel, GitHub Pages, atau server sendiri).
+1. Push repo ke GitHub
+2. Import project di [Vercel](https://vercel.com)
+3. Di **Settings → Environment Variables**, tambahkan:
+   - `GOOGLE_SHEETS_API_KEY`
+   - `GOOGLE_SHEETS_ID`
+   - `GOOGLE_SHEETS_NAME` (opsional, default `BOSS Timer`)
+4. Deploy
 
-## Tampilan
+Endpoint production: `https://your-app.vercel.app/api/sheets?range=A2:D`  
+(server yang memanggil Google; key tidak ikut ke browser)
 
-UI sudah didesain ulang jadi tema "panel HUD raid tracker": background gelap
-dengan gradient ungu lembut, font Cinzel untuk judul/nama boss, dan
-JetBrains Mono untuk angka countdown (biar mudah dibaca, tabular).
+### Penting soal keamanan API key
 
-- **Kartu "Akan Spawn Sebentar Lagi"** muncul otomatis di paling atas kalau
-  ada boss (field boss atau mingguan) yang tinggal <=15 menit lagi atau
-  sudah waktunya spawn. Tiap kartu punya ring countdown melingkar (mirip
-  cooldown skill di game) yang mengecil seiring waktu berkurang, kuning untuk
-  "segera" dan merah berdenyut untuk "sudah waktunya".
-- Semua boss ditampilkan sebagai card grid (bukan tabel lagi), responsif ke
-  mobile.
-- Warna aksen kartu berubah otomatis: netral -> kuning (segera) -> merah
-  (sudah lewat waktu, khusus field boss).
+- Key yang pernah ada di frontend / chat **sebaiknya di-rotate** di Google Cloud Console
+- Restrict key ke **Google Sheets API** saja
+- Setelah pakai proxy, batasi juga jika memungkinkan
 
-## Fitur MVP
+## Fitur
 
-Ada 2 jenis boss, sesuai data di spreadsheet:
-
-**1. Field Boss (interval)** — Venatus, Viorent, Ego, Livera, Lady Dalia,
-Undomiel, Araneo, Baron. Next spawn dihitung dari `Time of Death + Spawn
-Interval`.
-- Tombol "Tandai Mati" untuk update waktu kematian ke waktu sekarang
-  (otomatis hitung ulang next spawn).
-- Tambah / hapus boss baru lewat form di bawah tabel.
-
-**2. Boss Mingguan (jadwal tetap)** — Clemantis, Saphirus, Neutro, Thymele,
-Milavy, Ringor, Roderick, Auraq, Chaiflock, Benji, Libitina, Rakajeth,
-Tumier, Camalia. Next spawn dihitung dari hari & jam tetap tiap minggu
-(beberapa boss punya 2 jadwal per minggu).
-
-Fitur umum:
-- Countdown real-time (update tiap detik) untuk semua boss.
-- Otomatis diurutkan dari yang paling cepat spawn.
-- Baris kuning = spawn dalam <= 15 menit. Baris merah + badge "UP" = sudah
-  waktunya spawn (khusus field boss).
-- Data disimpan otomatis di localStorage browser, jadi tidak hilang saat
-  refresh.
-- Tombol "Reset ke data spreadsheet" untuk kembali ke data awal dari
-  spreadsheet.
-
-## Data awal
-
-- Field boss: `src/lib/bossData.js`
-- Boss mingguan: `src/lib/weeklyBossData.js`
-
-Untuk mengubah/menambah data awal, edit langsung file-file tersebut.
-
-**Catatan zona waktu:** jam pada boss mingguan diasumsikan sama dengan
-zona waktu browser yang menjalankan app (WIB). Kalau di-deploy/dibuka dari
-device dengan zona waktu berbeda, hitungannya bisa geser.
-
-## Ide pengembangan lanjut (belum ada di MVP ini)
-
-- Sinkronisasi data antar device (backend/DB, bukan cuma localStorage)
-- Notifikasi/alert suara saat boss mau spawn
-- Multi-user / sharing jadwal boss ke guild
-- Import langsung dari Google Sheet (butuh API key & backend)
+- Sync data dari spreadsheet (auto tiap 1 menit)
+- Hero card sticky untuk boss ≤10 menit / spawn
+- Notifikasi browser + suara di 10 menit, 5 menit, dan spawn
+- View-only (update waktu kematian di spreadsheet)
