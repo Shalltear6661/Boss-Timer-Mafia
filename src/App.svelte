@@ -282,7 +282,7 @@
       <span class="brand-mark">◈</span>
       <div>
         <h1>Mafia Timer</h1>
-        <p class="tagline">Timer respawn dari spreadsheet</p>
+        <p class="tagline">Bersama MOJO kita kuasai Helena 6</p>
       </div>
     </div>
     <div class="header-right">
