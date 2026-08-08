@@ -65,23 +65,26 @@ const DAY_MAP = {
 }
 
 export async function fetchIntervalBosses() {
-  const rows = await fetchRange('A2:D')
+  // A–D: data boss, H: Turn (MAFIA / MAFIAx2)
+  const rows = await fetchRange('A2:H')
   const results = []
   for (const row of rows) {
     const name = (row[0] || '').trim()
-    if (!name) continue
+    if (!name || name === 'Boss Name') continue
     const level = Number(row[1]) || 0
     const interval = Number(row[2]) || 0
     const deathStr = (row[3] || '').trim()
     if (deathStr && deathStr.startsWith('01/01/2012')) continue
     const lastDeath = parseDeathDate(deathStr)
     if (!lastDeath) continue
+    const turn = (row[7] || '').trim()
     results.push({
       id: name.toLowerCase().replace(/\s+/g, '-'),
       name,
       level,
       spawnIntervalHours: interval,
       lastDeath,
+      turn,
     })
   }
   return results

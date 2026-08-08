@@ -16,7 +16,7 @@
   import WeeklyCard from './lib/WeeklyCard.svelte'
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
 
-  const STORAGE_KEY = 'boss-timer-data-v2'
+  const STORAGE_KEY = 'boss-timer-data-v3'
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v2'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
@@ -190,7 +190,30 @@
       .catch(() => {})
   }
 
+  function turnOrder(turn) {
+    const t = (turn || '').trim()
+    if (t === 'MAFIA') return 0
+    if (t === 'MAFIAx2') return 1
+    if (!t) return 99
+    return 50
+  }
+
+  function groupByTurn(list) {
+    const map = new Map()
+    for (const b of list) {
+      const key = (b.turn || '').trim() || 'Tanpa Turn'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(b)
+    }
+    return [...map.entries()].sort(
+      (a, b) => turnOrder(a[0] === 'Tanpa Turn' ? '' : a[0]) - turnOrder(b[0] === 'Tanpa Turn' ? '' : b[0]) ||
+        a[0].localeCompare(b[0])
+    )
+  }
+
   $: sortedBosses = [...bosses].sort((a, b) => {
+    const turnDiff = turnOrder(a.turn) - turnOrder(b.turn)
+    if (turnDiff !== 0) return turnDiff
     const nextA = a.lastDeath.getTime() + a.spawnIntervalHours * 3600 * 1000
     const nextB = b.lastDeath.getTime() + b.spawnIntervalHours * 3600 * 1000
     return nextA - nextB
@@ -205,12 +228,16 @@
     ...sortedBosses.map((b) => {
       const nextSpawn = b.lastDeath.getTime() + b.spawnIntervalHours * 3600 * 1000
       const msLeft = nextSpawn - now.getTime()
+      const turn = (b.turn || '').trim()
       return {
         id: 'ib-' + b.id,
         sourceId: b.id,
         type: 'interval',
         name: b.name,
-        meta: `Lv ${b.level} · interval ${b.spawnIntervalHours}j`,
+        turn,
+        meta: turn
+          ? `${turn} · Lv ${b.level} · interval ${b.spawnIntervalHours}j`
+          : `Lv ${b.level} · interval ${b.spawnIntervalHours}j`,
         msLeft,
         isUp: msLeft <= 0,
       }
@@ -223,6 +250,7 @@
         sourceId: b.id,
         type: 'weekly',
         name: b.name,
+        turn: '',
         meta: 'Boss mingguan',
         msLeft,
         isUp: msLeft <= 0,
@@ -236,6 +264,14 @@
   $: soonIds = new Set(soonList.map((b) => `${b.type}:${b.sourceId}`))
   $: remainingBosses = sortedBosses.filter((b) => !soonIds.has('interval:' + b.id))
   $: remainingWeekly = sortedWeeklyBosses.filter((b) => !soonIds.has('weekly:' + b.id))
+  $: bossesByTurn = groupByTurn(remainingBosses)
+  $: soonByTurn = (() => {
+    const intervalSoon = soonList.filter((b) => b.type === 'interval')
+    const weeklySoon = soonList.filter((b) => b.type === 'weekly')
+    const groups = groupByTurn(intervalSoon)
+    if (weeklySoon.length) groups.push(['Mingguan', weeklySoon])
+    return groups
+  })()
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
   $: if (soonList || bosses.length) {
@@ -341,22 +377,35 @@
         <h2 class="section-title alert">Akan Spawn Sebentar Lagi</h2>
         <span class="hero-count">{soonList.length} boss</span>
       </div>
-      <div class="hero-grid">
-        {#each soonList as b (b.id)}
-          <SpawnSoonCard
-            name={b.name}
-            meta={b.meta}
-            msLeft={b.msLeft}
-            isUp={b.isUp}
-            canMarkKilled={canEdit && b.type === 'interval'}
-            killing={killingId === b.sourceId}
-            onMarkKilled={() => {
-              const boss = bosses.find((x) => x.id === b.sourceId)
-              if (boss) markKilled(boss)
-            }}
-          />
-        {/each}
-      </div>
+      {#each soonByTurn as [turnLabel, turnBosses] (turnLabel)}
+        <div
+          class="turn-panel"
+          class:mafia={turnLabel === 'MAFIA'}
+          class:mafiax2={turnLabel === 'MAFIAx2'}
+          class:mingguan={turnLabel === 'Mingguan'}
+        >
+          <h3 class="turn-label">
+            <span class="turn-dot"></span>
+            {turnLabel}
+          </h3>
+          <div class="hero-grid">
+            {#each turnBosses as b (b.id)}
+              <SpawnSoonCard
+                name={b.name}
+                meta={b.meta}
+                msLeft={b.msLeft}
+                isUp={b.isUp}
+                canMarkKilled={canEdit && b.type === 'interval'}
+                killing={killingId === b.sourceId}
+                onMarkKilled={() => {
+                  const boss = bosses.find((x) => x.id === b.sourceId)
+                  if (boss) markKilled(boss)
+                }}
+              />
+            {/each}
+          </div>
+        </div>
+      {/each}
     </section>
   {/if}
 
@@ -397,17 +446,30 @@
     {#if remainingBosses.length === 0}
       <p class="empty-hint">Semua field boss yang relevan sedang ditampilkan di atas.</p>
     {:else}
-      <div class="card-grid">
-        {#each remainingBosses as boss (boss.id)}
-          <BossCard
-            {boss}
-            {now}
-            onMarkKilled={canEdit ? markKilled : null}
-            killing={killingId === boss.id}
-            showKill={canEdit}
-          />
-        {/each}
-      </div>
+      {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
+        <div
+          class="turn-panel"
+          class:mafia={turnLabel === 'MAFIA'}
+          class:mafiax2={turnLabel === 'MAFIAx2'}
+        >
+          <h3 class="turn-label">
+            <span class="turn-dot"></span>
+            Turn {turnLabel}
+            <span class="turn-count">{turnBosses.length}</span>
+          </h3>
+          <div class="card-grid">
+            {#each turnBosses as boss (boss.id)}
+              <BossCard
+                {boss}
+                {now}
+                onMarkKilled={canEdit ? markKilled : null}
+                killing={killingId === boss.id}
+                showKill={canEdit}
+              />
+            {/each}
+          </div>
+        </div>
+      {/each}
     {/if}
   </section>
 
@@ -745,6 +807,83 @@
     text-transform: none;
     letter-spacing: normal;
     font-size: 15px;
+  }
+
+  .turn-panel {
+    margin-bottom: 16px;
+    padding: 14px 16px 16px;
+    border-radius: 14px;
+    border: 1px solid #2a2a38;
+    background: #14141e;
+  }
+  .turn-panel:last-child {
+    margin-bottom: 0;
+  }
+  .turn-panel.mafia {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(20, 20, 30, 0.95) 55%);
+    box-shadow: inset 3px 0 0 #3b82f6;
+  }
+  .turn-panel.mafiax2 {
+    border-color: rgba(168, 85, 247, 0.5);
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(20, 20, 30, 0.95) 55%);
+    box-shadow: inset 3px 0 0 #a855f7;
+  }
+  .turn-panel.mingguan {
+    border-color: rgba(240, 180, 40, 0.35);
+    background: linear-gradient(135deg, rgba(240, 180, 40, 0.1) 0%, rgba(20, 20, 30, 0.95) 55%);
+    box-shadow: inset 3px 0 0 #f0b428;
+  }
+  .turn-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #c8c8d8;
+  }
+  .turn-panel.mafia .turn-label {
+    color: #93c5fd;
+  }
+  .turn-panel.mafiax2 .turn-label {
+    color: #e9d5ff;
+  }
+  .turn-panel.mingguan .turn-label {
+    color: #f0b428;
+  }
+  .turn-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #6a6a80;
+    flex-shrink: 0;
+  }
+  .turn-panel.mafia .turn-dot {
+    background: #3b82f6;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
+  }
+  .turn-panel.mafiax2 .turn-dot {
+    background: #a855f7;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
+  }
+  .turn-panel.mingguan .turn-dot {
+    background: #f0b428;
+    box-shadow: 0 0 10px rgba(240, 180, 40, 0.6);
+  }
+  .turn-count {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0.75;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 1px 8px;
+    margin-left: 2px;
   }
 
   section {

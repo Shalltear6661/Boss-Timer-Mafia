@@ -27,11 +27,22 @@
   }
 </script>
 
-<article class="card" class:soon={isSoon} class:up={isUp}>
+<article
+  class="card"
+  class:soon={isSoon}
+  class:up={isUp}
+  class:turn-mafia={boss.turn === 'MAFIA'}
+  class:turn-mafiax2={boss.turn === 'MAFIAx2'}
+>
   <div class="top">
     <h4>{boss.name}</h4>
     <span class="lv">Lv {boss.level}</span>
   </div>
+  {#if boss.turn}
+    <span class="turn-badge" class:mafia={boss.turn === 'MAFIA'} class:mafiax2={boss.turn === 'MAFIAx2'}>
+      {boss.turn}
+    </span>
+  {/if}
   <div class="countdown">{formatCountdown(msLeft)}</div>
   <div class="details">
     <span>Interval {boss.spawnIntervalHours}j</span>
@@ -58,6 +69,14 @@
     gap: 8px;
     transition: border-color 0.2s, background 0.2s;
   }
+  .card.turn-mafia {
+    border-left-color: #3b82f6;
+    background: rgba(37, 99, 235, 0.1);
+  }
+  .card.turn-mafiax2 {
+    border-left-color: #a855f7;
+    background: rgba(147, 51, 234, 0.12);
+  }
   .card.soon {
     border-left-color: #f0b428;
     background: rgba(240, 180, 40, 0.06);
@@ -76,6 +95,28 @@
     font-family: 'Cinzel', serif;
     font-size: 15px;
     color: #f0eef7;
+  }
+  .turn-badge {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #2a2a38;
+    color: #a8a8b8;
+    border: 1px solid transparent;
+  }
+  .turn-badge.mafia {
+    background: rgba(59, 130, 246, 0.28);
+    color: #bfdbfe;
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+  .turn-badge.mafiax2 {
+    background: rgba(168, 85, 247, 0.3);
+    color: #f3e8ff;
+    border-color: rgba(168, 85, 247, 0.55);
   }
   .lv {
     font-size: 11px;
