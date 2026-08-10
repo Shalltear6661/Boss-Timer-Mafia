@@ -21,7 +21,9 @@
   const TURN_MIN_KEY = 'boss-timer-turn-min-v1'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
-  const MINIMIZED_BOSS_COUNT = 4
+  const MINIMIZED_BOSS_COUNT_MOBILE = 3
+  const MINIMIZED_BOSS_COUNT_DESKTOP = 4
+  const MOBILE_MQ = '(max-width: 719px)'
   // Service Account + share sheet sudah siap
   const ENABLE_MARK_KILLED = true
 
@@ -44,6 +46,13 @@
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
   let searchQuery = ''
   let turnMinimized = loadTurnMinimized()
+  let isMobile =
+    typeof window !== 'undefined' && window.matchMedia
+      ? window.matchMedia(MOBILE_MQ).matches
+      : true
+  let mobileMq
+
+  $: minimizedBossCount = isMobile ? MINIMIZED_BOSS_COUNT_MOBILE : MINIMIZED_BOSS_COUNT_DESKTOP
 
   function loadTurnMinimized() {
     try {
@@ -70,8 +79,8 @@
   }
 
   function visibleTurnBosses(list, key) {
-    if (!isTurnMinimized(key) || list.length <= MINIMIZED_BOSS_COUNT) return list
-    return list.slice(0, MINIMIZED_BOSS_COUNT)
+    if (!isTurnMinimized(key) || list.length <= minimizedBossCount) return list
+    return list.slice(0, minimizedBossCount)
   }
 
   $: canEdit = ENABLE_MARK_KILLED && !!user.canEdit
@@ -356,6 +365,16 @@
     if (ENABLE_MARK_KILLED) initAuth()
     else authReady = true
     notifEnabled = isNotificationGranted()
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      mobileMq = window.matchMedia(MOBILE_MQ)
+      isMobile = mobileMq.matches
+      const onMq = (e) => {
+        isMobile = e.matches
+      }
+      if (mobileMq.addEventListener) mobileMq.addEventListener('change', onMq)
+      else mobileMq.addListener(onMq)
+      mobileMq._onChange = onMq
+    }
     const unlockOnce = () => {
       unlockAudio()
       window.removeEventListener('pointerdown', unlockOnce)
@@ -372,6 +391,10 @@
   onDestroy(() => {
     if (tickInterval) clearInterval(tickInterval)
     if (syncInterval) clearInterval(syncInterval)
+    if (mobileMq?._onChange) {
+      if (mobileMq.removeEventListener) mobileMq.removeEventListener('change', mobileMq._onChange)
+      else mobileMq.removeListener(mobileMq._onChange)
+    }
   })
 </script>
 
@@ -381,7 +404,7 @@
       <span class="brand-mark">◈</span>
       <div>
         <h1>Mafia Timer</h1>
-        <p class="tagline">Bersama MOJO kita kuasai Helena 6</p>
+        <h2 class="tagline">Bersama MOJO kita kuasai LORDNINE</h2>
       </div>
     </div>
     <div class="header-right">
@@ -553,7 +576,7 @@
             <span class="turn-dot"></span>
             {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : `Turn ${turnLabel}`}
             <span class="turn-count">{turnBosses.length}</span>
-            {#if turnBosses.length > MINIMIZED_BOSS_COUNT}
+            {#if turnBosses.length > minimizedBossCount}
               <button
                 type="button"
                 class="turn-toggle"
@@ -575,8 +598,8 @@
               />
             {/each}
           </div>
-          {#if minimized && turnBosses.length > MINIMIZED_BOSS_COUNT}
-            <p class="min-hint">Menampilkan {MINIMIZED_BOSS_COUNT} dari {turnBosses.length} boss</p>
+          {#if minimized && turnBosses.length > minimizedBossCount}
+            <p class="min-hint">Menampilkan {minimizedBossCount} dari {turnBosses.length} boss</p>
           {/if}
         </div>
       {/each}
@@ -601,7 +624,7 @@
             bosses={group.bosses}
             {now}
             minimized={isTurnMinimized('weekly:' + group.turn)}
-            minCount={MINIMIZED_BOSS_COUNT}
+            minCount={minimizedBossCount}
             onToggleMinimize={() => toggleTurnMinimized('weekly:' + group.turn)}
           />
         {/each}
@@ -667,8 +690,12 @@
   }
   .tagline {
     margin: 2px 0 0;
-    font-size: 12px;
-    color: #7a7a90;
+    font-size: 14px;
+    color: #f0b428;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
   }
   .clock {
     text-align: right;
