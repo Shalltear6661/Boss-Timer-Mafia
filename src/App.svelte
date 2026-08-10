@@ -17,7 +17,7 @@
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
 
   const STORAGE_KEY = 'boss-timer-data-v3'
-  const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v2'
+  const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v3'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
   // Set true lagi setelah Service Account siap
@@ -245,13 +245,17 @@
     ...sortedWeeklyBosses.map((b) => {
       const nextSpawn = nextSpawnFor(b, now)
       const msLeft = nextSpawn.getTime() - now.getTime()
+      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+      const days = (b.schedules || []).map((s) => dayNames[s.day]).join('/')
       return {
         id: 'wb-' + b.id,
         sourceId: b.id,
         type: 'weekly',
         name: b.name,
         turn: '',
-        meta: 'Boss mingguan',
+        meta: days
+          ? `${days} · next ${dayNames[nextSpawn.getDay()]}`
+          : 'Boss mingguan',
         msLeft,
         isUp: msLeft <= 0,
       }

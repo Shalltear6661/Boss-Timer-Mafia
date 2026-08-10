@@ -1,5 +1,5 @@
 <script>
-  import { nextSpawnFor, dayName } from './weeklyBossData.js'
+  import { nextSpawnFor, upcomingSchedules, dayName } from './weeklyBossData.js'
 
   export let boss
   export let now
@@ -7,6 +7,8 @@
   $: nextSpawn = nextSpawnFor(boss, now)
   $: msLeft = nextSpawn.getTime() - now.getTime()
   $: isSoon = msLeft <= 10 * 60 * 1000 && msLeft > 0
+  $: isUp = msLeft <= 0
+  $: scheduleRows = upcomingSchedules(boss, now)
 
   function formatCountdown(ms) {
     if (ms <= 0) return 'SPAWN!'
@@ -17,28 +19,29 @@
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  function formatSchedule(s) {
-    return `${dayName(s.day)} ${s.time}`
-  }
-
-  function formatNext(date) {
-    return `${dayName(date.getDay())} ${date.toLocaleTimeString('id-ID', {
+  function formatClock(date) {
+    return date.toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-    })}`
+    })
   }
 </script>
 
-<article class="card" class:soon={isSoon}>
+<article class="card" class:soon={isSoon} class:up={isUp}>
   <div class="top">
     <h4>{boss.name}</h4>
+    <span class="next-hint">Next {dayName(nextSpawn.getDay())} {formatClock(nextSpawn)}</span>
   </div>
   <div class="countdown">{formatCountdown(msLeft)}</div>
-  <div class="details">
-    <span class="schedule">{boss.schedules.map(formatSchedule).join(' / ')}</span>
-    <span>Next {formatNext(nextSpawn)}</span>
-  </div>
+  <ul class="schedule-list">
+    {#each scheduleRows as row, i (row.day + '-' + row.time)}
+      <li class:primary={i === 0} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
+        <span class="day">{dayName(row.day)} {row.time}</span>
+        <span class="row-countdown">{formatCountdown(row.msLeft)}</span>
+      </li>
+    {/each}
+  </ul>
 </article>
 
 <style>
@@ -57,16 +60,26 @@
     border-left-color: #f0b428;
     background: rgba(240, 180, 40, 0.06);
   }
+  .card.up {
+    border-left-color: #e0483c;
+    background: rgba(224, 72, 60, 0.08);
+  }
   .top {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+    gap: 8px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
     font-size: 15px;
     color: #f0eef7;
+  }
+  .next-hint {
+    font-size: 11px;
+    color: #8a8aa0;
+    white-space: nowrap;
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -78,17 +91,45 @@
   .soon .countdown {
     color: #f0b428;
   }
-  .details {
+  .up .countdown {
+    color: #ff6b6b;
+  }
+  .schedule-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .schedule-list li {
     display: flex;
     justify-content: space-between;
-    font-size: 11.5px;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
     color: #8a8aa0;
-    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.03);
   }
-  .schedule {
-    color: #a08ce0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .schedule-list li.primary {
+    color: #d4c4ff;
+    background: rgba(124, 92, 200, 0.18);
+    border: 1px solid rgba(160, 140, 224, 0.35);
+  }
+  .schedule-list li.soon-row {
+    color: #f0b428;
+    background: rgba(240, 180, 40, 0.1);
+    border: 1px solid rgba(240, 180, 40, 0.35);
+  }
+  .day {
+    font-weight: 500;
+  }
+  .row-countdown {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 11.5px;
+    font-weight: 600;
   }
 </style>

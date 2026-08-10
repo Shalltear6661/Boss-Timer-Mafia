@@ -44,11 +44,15 @@ function parseDeathDate(str) {
 }
 
 /**
- * Parse time format "10:30 AM" atau "6:00 PM" jadi "HH:mm" 24 jam
+ * Parse time format "10:30 AM" atau "6:00 PM" jadi "HH:mm" 24 jam.
+ * Google Sheets sering pakai NBSP / narrow NBSP di antara jam dan AM/PM.
  */
 function parseTime12h(str) {
   if (!str || !str.trim()) return null
-  const clean = str.trim().replace(/\s+/g, ' ')
+  const clean = str
+    .trim()
+    .replace(/[\u00A0\u202F\u2007\u2060]/g, ' ')
+    .replace(/\s+/g, ' ')
   const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
   if (!match) return null
   let h = parseInt(match[1], 10)
@@ -62,6 +66,8 @@ function parseTime12h(str) {
 const DAY_MAP = {
   sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
   thursday: 4, friday: 5, saturday: 6,
+  minggu: 0, senin: 1, selasa: 2, rabu: 3,
+  kamis: 4, jumat: 5, 'jum\'at': 5, sabtu: 6,
 }
 
 export async function fetchIntervalBosses() {
