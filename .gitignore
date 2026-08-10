@@ -4,3 +4,6 @@ dist
 .DS_Store
 *.local
 .vercel
+service-account.json
+*-service-account.json
+bosstimer-*.json

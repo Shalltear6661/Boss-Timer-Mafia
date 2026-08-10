@@ -20,8 +20,8 @@
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v3'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
-  // Set true lagi setelah Service Account siap
-  const ENABLE_MARK_KILLED = false
+  // Service Account + share sheet sudah siap
+  const ENABLE_MARK_KILLED = true
 
   let bosses = []
   let weeklyBossesList = []
@@ -40,8 +40,17 @@
   let notifSupported = typeof Notification !== 'undefined'
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+  let searchQuery = ''
 
   $: canEdit = ENABLE_MARK_KILLED && !!user.canEdit
+  $: searchNeedle = searchQuery.trim().toLowerCase()
+
+  function matchesSearch(name) {
+    if (!searchNeedle) return true
+    return String(name || '')
+      .toLowerCase()
+      .includes(searchNeedle)
+  }
 
   function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -266,16 +275,24 @@
 
   // ID boss yang sudah di hero — jangan duplikat di list bawah
   $: soonIds = new Set(soonList.map((b) => `${b.type}:${b.sourceId}`))
-  $: remainingBosses = sortedBosses.filter((b) => !soonIds.has('interval:' + b.id))
-  $: remainingWeekly = sortedWeeklyBosses.filter((b) => !soonIds.has('weekly:' + b.id))
+  $: remainingBosses = sortedBosses.filter(
+    (b) => !soonIds.has('interval:' + b.id) && matchesSearch(b.name)
+  )
+  $: remainingWeekly = sortedWeeklyBosses.filter(
+    (b) => !soonIds.has('weekly:' + b.id) && matchesSearch(b.name)
+  )
+  $: filteredSoonList = soonList.filter((b) => matchesSearch(b.name))
   $: bossesByTurn = groupByTurn(remainingBosses)
   $: soonByTurn = (() => {
-    const intervalSoon = soonList.filter((b) => b.type === 'interval')
-    const weeklySoon = soonList.filter((b) => b.type === 'weekly')
+    const intervalSoon = filteredSoonList.filter((b) => b.type === 'interval')
+    const weeklySoon = filteredSoonList.filter((b) => b.type === 'weekly')
     const groups = groupByTurn(intervalSoon)
     if (weeklySoon.length) groups.push(['Mingguan', weeklySoon])
     return groups
   })()
+  $: searchHitCount =
+    filteredSoonList.length + remainingBosses.length + remainingWeekly.length
+  $: searching = searchNeedle.length > 0
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
   $: if (soonList || bosses.length) {
@@ -379,37 +396,41 @@
     <section class="hero sticky-hero">
       <div class="hero-header">
         <h2 class="section-title alert">Akan Spawn Sebentar Lagi</h2>
-        <span class="hero-count">{soonList.length} boss</span>
+        <span class="hero-count">{filteredSoonList.length} boss</span>
       </div>
-      {#each soonByTurn as [turnLabel, turnBosses] (turnLabel)}
-        <div
-          class="turn-panel"
-          class:mafia={turnLabel === 'MAFIA'}
-          class:mafiax2={turnLabel === 'MAFIAx2'}
-          class:mingguan={turnLabel === 'Mingguan'}
-        >
-          <h3 class="turn-label">
-            <span class="turn-dot"></span>
-            {turnLabel}
-          </h3>
-          <div class="hero-grid">
-            {#each turnBosses as b (b.id)}
-              <SpawnSoonCard
-                name={b.name}
-                meta={b.meta}
-                msLeft={b.msLeft}
-                isUp={b.isUp}
-                canMarkKilled={canEdit && b.type === 'interval'}
-                killing={killingId === b.sourceId}
-                onMarkKilled={() => {
-                  const boss = bosses.find((x) => x.id === b.sourceId)
-                  if (boss) markKilled(boss)
-                }}
-              />
-            {/each}
+      {#if filteredSoonList.length === 0 && searching}
+        <p class="empty-hint">Tidak ada boss hampir spawn yang cocok dengan pencarian.</p>
+      {:else}
+        {#each soonByTurn as [turnLabel, turnBosses] (turnLabel)}
+          <div
+            class="turn-panel"
+            class:mafia={turnLabel === 'MAFIA'}
+            class:mafiax2={turnLabel === 'MAFIAx2'}
+            class:mingguan={turnLabel === 'Mingguan'}
+          >
+            <h3 class="turn-label">
+              <span class="turn-dot"></span>
+              {turnLabel}
+            </h3>
+            <div class="hero-grid">
+              {#each turnBosses as b (b.id)}
+                <SpawnSoonCard
+                  name={b.name}
+                  meta={b.meta}
+                  msLeft={b.msLeft}
+                  isUp={b.isUp}
+                  canMarkKilled={canEdit && b.type === 'interval'}
+                  killing={killingId === b.sourceId}
+                  onMarkKilled={() => {
+                    const boss = bosses.find((x) => x.id === b.sourceId)
+                    if (boss) markKilled(boss)
+                  }}
+                />
+              {/each}
+            </div>
           </div>
-        </div>
-      {/each}
+        {/each}
+      {/if}
     </section>
   {/if}
 
@@ -445,10 +466,35 @@
     </div>
   {/if}
 
+  <div class="search-bar">
+    <input
+      type="search"
+      class="search-input"
+      placeholder="Cari boss by nama..."
+      bind:value={searchQuery}
+      autocomplete="off"
+      spellcheck="false"
+    />
+    {#if searching}
+      <span class="search-meta">{searchHitCount} hasil</span>
+      <button type="button" class="search-clear" on:click={() => (searchQuery = '')}>Hapus</button>
+    {/if}
+  </div>
+
+  {#if searching && searchHitCount === 0}
+    <p class="empty-hint search-empty">Tidak ada boss bernama “{searchQuery.trim()}”.</p>
+  {/if}
+
   <section>
     <h2 class="section-title">Field Boss (Interval)</h2>
     {#if remainingBosses.length === 0}
-      <p class="empty-hint">Semua field boss yang relevan sedang ditampilkan di atas.</p>
+      <p class="empty-hint">
+        {#if searching}
+          Tidak ada field boss yang cocok.
+        {:else}
+          Semua field boss yang relevan sedang ditampilkan di atas.
+        {/if}
+      </p>
     {:else}
       {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
         <div
@@ -480,7 +526,13 @@
   <section>
     <h2 class="section-title">Boss Mingguan (Jadwal Tetap)</h2>
     {#if remainingWeekly.length === 0}
-      <p class="empty-hint">Semua boss mingguan yang relevan sedang ditampilkan di atas.</p>
+      <p class="empty-hint">
+        {#if searching}
+          Tidak ada boss mingguan yang cocok.
+        {:else}
+          Semua boss mingguan yang relevan sedang ditampilkan di atas.
+        {/if}
+      </p>
     {:else}
       <div class="card-grid">
         {#each remainingWeekly as boss (boss.id)}
@@ -492,7 +544,7 @@
 
   <footer>
     <p class="footer-note">
-      Data dari Google Spreadsheet. Update waktu kematian di sheet; app sync otomatis tiap menit.
+      Login sebagai Editor untuk Tandai Mati. Data sync dari spreadsheet tiap menit.
     </p>
     <button class="link" on:click={refreshFromSpreadsheet} disabled={syncing}>
       {syncing ? 'Menyinkronkan...' : 'Refresh data sekarang'}
@@ -796,6 +848,59 @@
     border: 1px solid rgba(224, 72, 60, 0.4);
     color: #ff8478;
     font-size: 13px;
+  }
+
+  .search-empty {
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed #2a2a38;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .search-input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid #2a2a38;
+    background: #14141e;
+    color: #eee;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .search-input::placeholder {
+    color: #6a6a80;
+  }
+  .search-input:focus {
+    border-color: rgba(160, 140, 224, 0.55);
+    box-shadow: 0 0 0 3px rgba(124, 92, 200, 0.18);
+  }
+  .search-meta {
+    font-size: 12px;
+    color: #8a8aa0;
+    white-space: nowrap;
+  }
+  .search-clear {
+    border: 1px solid #2a2a38;
+    background: #1a1a26;
+    color: #c8c8d8;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .search-clear:hover {
+    border-color: #3a3a4a;
+    color: #fff;
   }
 
   .section-title {

@@ -2,12 +2,15 @@
  * Access token untuk menulis ke Google Sheets.
  *
  * Prioritas:
- * 1. Service Account (disarankan) — GOOGLE_SERVICE_ACCOUNT_EMAIL + PRIVATE_KEY
- *    atau GOOGLE_SERVICE_ACCOUNT_JSON (string JSON lengkap)
- * 2. Fallback OAuth refresh token pemilik sheet (opsional / legacy)
+ * 1. GOOGLE_SERVICE_ACCOUNT_FILE → path ke file JSON key
+ * 2. GOOGLE_SERVICE_ACCOUNT_JSON → string JSON lengkap
+ * 3. GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
+ * 4. Fallback OAuth refresh token (legacy)
  */
 
 import crypto from 'node:crypto'
+import { readFileSync, existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 const SA_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -17,17 +20,58 @@ function b64url(input) {
   return buf.toString('base64url')
 }
 
+function normalizePrivateKey(raw) {
+  let key = String(raw || '').trim()
+  // Hapus kutip wrapping (env / paste)
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    key = key.slice(1, -1).trim()
+  }
+  // Literal \n → newline (Vercel / .env satu baris)
+  key = key.replace(/\\n/g, '\n')
+  // Rapikan spasi aneh di sekitar header PEM
+  key = key.replace(/\r\n/g, '\n')
+  if (!key.endsWith('\n')) key += '\n'
+  return key
+}
+
+function fromJsonObject(parsed) {
+  if (!parsed?.client_email || !parsed?.private_key) return null
+  return {
+    clientEmail: String(parsed.client_email).trim(),
+    privateKey: normalizePrivateKey(parsed.private_key),
+  }
+}
+
 function parseServiceAccount(env) {
+  const filePath = (env['GOOGLE_SERVICE_ACCOUNT_FILE'] || '').trim()
+  if (filePath) {
+    const abs = resolve(process.cwd(), filePath)
+    if (!existsSync(abs)) {
+      const err = new Error(`File Service Account tidak ditemukan: ${filePath}`)
+      err.code = 'MISSING_SA'
+      throw err
+    }
+    try {
+      const parsed = JSON.parse(readFileSync(abs, 'utf8'))
+      const sa = fromJsonObject(parsed)
+      if (sa) return sa
+    } catch (e) {
+      const err = new Error('GOOGLE_SERVICE_ACCOUNT_FILE bukan JSON Service Account yang valid')
+      err.code = 'MISSING_SA'
+      err.cause = e
+      throw err
+    }
+  }
+
   const rawJson = env['GOOGLE_SERVICE_ACCOUNT_JSON']
   if (rawJson) {
     try {
       const parsed = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson
-      if (parsed?.client_email && parsed?.private_key) {
-        return {
-          clientEmail: parsed.client_email,
-          privateKey: String(parsed.private_key).replace(/\\n/g, '\n'),
-        }
-      }
+      const sa = fromJsonObject(parsed)
+      if (sa) return sa
     } catch {
       const err = new Error('GOOGLE_SERVICE_ACCOUNT_JSON tidak valid (bukan JSON)')
       err.code = 'MISSING_SA'
@@ -36,17 +80,8 @@ function parseServiceAccount(env) {
   }
 
   const clientEmail = (env['GOOGLE_SERVICE_ACCOUNT_EMAIL'] || '').trim()
-  let privateKey = (env['GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'] || '').trim()
-  if (clientEmail && privateKey) {
-    // Vercel/env sering menyimpan newline sebagai \n
-    privateKey = privateKey.replace(/\\n/g, '\n')
-    // Hapus kutip wrapping jika ada
-    if (
-      (privateKey.startsWith('"') && privateKey.endsWith('"')) ||
-      (privateKey.startsWith("'") && privateKey.endsWith("'"))
-    ) {
-      privateKey = privateKey.slice(1, -1).replace(/\\n/g, '\n')
-    }
+  const privateKey = normalizePrivateKey(env['GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY'] || '')
+  if (clientEmail && privateKey.includes('BEGIN PRIVATE KEY')) {
     return { clientEmail, privateKey }
   }
 
@@ -56,6 +91,18 @@ function parseServiceAccount(env) {
 async function getServiceAccountAccessToken(env) {
   const sa = parseServiceAccount(env)
   if (!sa) return null
+
+  let keyObject
+  try {
+    keyObject = crypto.createPrivateKey(sa.privateKey)
+  } catch (e) {
+    const err = new Error(
+      'Private key Service Account tidak valid. Download ulang JSON key, lalu: npm run sa:env -- ./file.json'
+    )
+    err.code = 'SA_KEY_INVALID'
+    err.cause = e
+    throw err
+  }
 
   const now = Math.floor(Date.now() / 1000)
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
@@ -69,17 +116,10 @@ async function getServiceAccountAccessToken(env) {
     })
   )
   const unsigned = `${header}.${claim}`
-  let signature
-  try {
-    signature = crypto.sign('RSA-SHA256', Buffer.from(unsigned), sa.privateKey)
-  } catch (e) {
-    const err = new Error(
-      'Private key Service Account tidak valid. Pastikan GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY lengkap (termasuk BEGIN/END).'
-    )
-    err.code = 'SA_KEY_INVALID'
-    err.cause = e
-    throw err
-  }
+  const signer = crypto.createSign('RSA-SHA256')
+  signer.update(unsigned)
+  signer.end()
+  const signature = signer.sign(keyObject)
   const assertion = `${unsigned}.${b64url(signature)}`
 
   const res = await fetch(TOKEN_URL, {
@@ -93,8 +133,11 @@ async function getServiceAccountAccessToken(env) {
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok || !data.access_token) {
+    const msg = data.error_description || data.error || `Gagal token Service Account (${res.status})`
     const err = new Error(
-      data.error_description || data.error || `Gagal token Service Account (${res.status})`
+      /invalid jwt signature/i.test(msg)
+        ? 'Invalid JWT Signature — key SA di Google Cloud tidak cocok dengan file JSON. Hapus key lama, buat key JSON baru, ganti file, lalu npm run sa:test'
+        : msg
     )
     err.code = 'SA_TOKEN_FAILED'
     throw err
@@ -140,7 +183,7 @@ export async function getAccessToken(env = process.env) {
   if (oauthToken) return oauthToken
 
   const err = new Error(
-    'Belum ada kredensial tulis. Set Service Account: GOOGLE_SERVICE_ACCOUNT_EMAIL + GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY (atau GOOGLE_SERVICE_ACCOUNT_JSON), lalu share spreadsheet ke email SA sebagai Editor.'
+    'Belum ada kredensial tulis. Set GOOGLE_SERVICE_ACCOUNT_FILE=./service-account.json (atau EMAIL + PRIVATE_KEY), lalu share spreadsheet ke email SA sebagai Editor.'
   )
   err.code = 'MISSING_WRITE_CREDS'
   throw err
