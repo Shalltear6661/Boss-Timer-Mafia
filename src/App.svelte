@@ -17,7 +17,7 @@
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
 
   const STORAGE_KEY = 'boss-timer-data-v3'
-  const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v3'
+  const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v4'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
   // Service Account + share sheet sudah siap
@@ -199,24 +199,29 @@
       .catch(() => {})
   }
 
-  function turnOrder(turn) {
+  function normalizeTurn(turn) {
     const t = (turn || '').trim()
+    if (!t || t === '-') return 'Tanpa Turn'
+    return t
+  }
+
+  function turnOrder(turn) {
+    const t = normalizeTurn(turn)
     if (t === 'MAFIA') return 0
     if (t === 'MAFIAx2') return 1
-    if (!t) return 99
+    if (t === 'Tanpa Turn') return 99
     return 50
   }
 
   function groupByTurn(list) {
     const map = new Map()
     for (const b of list) {
-      const key = (b.turn || '').trim() || 'Tanpa Turn'
+      const key = normalizeTurn(b.turn)
       if (!map.has(key)) map.set(key, [])
       map.get(key).push(b)
     }
     return [...map.entries()].sort(
-      (a, b) => turnOrder(a[0] === 'Tanpa Turn' ? '' : a[0]) - turnOrder(b[0] === 'Tanpa Turn' ? '' : b[0]) ||
-        a[0].localeCompare(b[0])
+      (a, b) => turnOrder(a[0]) - turnOrder(b[0]) || a[0].localeCompare(b[0])
     )
   }
 
@@ -228,9 +233,11 @@
     return nextA - nextB
   })
 
-  $: sortedWeeklyBosses = [...weeklyBossesList].sort(
-    (a, b) => nextSpawnFor(a, now).getTime() - nextSpawnFor(b, now).getTime()
-  )
+  $: sortedWeeklyBosses = [...weeklyBossesList].sort((a, b) => {
+    const turnDiff = turnOrder(a.turn) - turnOrder(b.turn)
+    if (turnDiff !== 0) return turnDiff
+    return nextSpawnFor(a, now).getTime() - nextSpawnFor(b, now).getTime()
+  })
 
   // Boss yang segera spawn (<=10 menit) atau sudah waktunya — selalu di atas (hero sticky)
   $: soonList = [
@@ -256,15 +263,17 @@
       const msLeft = nextSpawn.getTime() - now.getTime()
       const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
       const days = (b.schedules || []).map((s) => dayNames[s.day]).join('/')
+      const turn = (b.turn || '').trim()
+      const turnPart = turn ? `${turn} · ` : ''
       return {
         id: 'wb-' + b.id,
         sourceId: b.id,
         type: 'weekly',
         name: b.name,
-        turn: '',
+        turn,
         meta: days
-          ? `${days} · next ${dayNames[nextSpawn.getDay()]}`
-          : 'Boss mingguan',
+          ? `${turnPart}${days} · next ${dayNames[nextSpawn.getDay()]}`
+          : turnPart + 'Boss mingguan',
         msLeft,
         isUp: msLeft <= 0,
       }
@@ -278,20 +287,21 @@
   $: remainingBosses = sortedBosses.filter(
     (b) => !soonIds.has('interval:' + b.id) && matchesSearch(b.name)
   )
-  $: remainingWeekly = sortedWeeklyBosses.filter(
-    (b) => !soonIds.has('weekly:' + b.id) && matchesSearch(b.name)
-  )
+  $: weeklyTurnCards = ['MAFIA', 'MAFIAx2']
+    .map((turn) => ({
+      turn,
+      bosses: sortedWeeklyBosses.filter(
+        (b) => (b.turn || '').trim() === turn && matchesSearch(b.name)
+      ),
+    }))
+    .filter((g) => g.bosses.length > 0)
   $: filteredSoonList = soonList.filter((b) => matchesSearch(b.name))
   $: bossesByTurn = groupByTurn(remainingBosses)
-  $: soonByTurn = (() => {
-    const intervalSoon = filteredSoonList.filter((b) => b.type === 'interval')
-    const weeklySoon = filteredSoonList.filter((b) => b.type === 'weekly')
-    const groups = groupByTurn(intervalSoon)
-    if (weeklySoon.length) groups.push(['Mingguan', weeklySoon])
-    return groups
-  })()
+  $: soonByTurn = groupByTurn(filteredSoonList)
   $: searchHitCount =
-    filteredSoonList.length + remainingBosses.length + remainingWeekly.length
+    filteredSoonList.length +
+    remainingBosses.length +
+    weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
   $: searching = searchNeedle.length > 0
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
@@ -406,11 +416,11 @@
             class="turn-panel"
             class:mafia={turnLabel === 'MAFIA'}
             class:mafiax2={turnLabel === 'MAFIAx2'}
-            class:mingguan={turnLabel === 'Mingguan'}
+            class:noturn={turnLabel === 'Tanpa Turn'}
           >
             <h3 class="turn-label">
               <span class="turn-dot"></span>
-              {turnLabel}
+              {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : turnLabel}
             </h3>
             <div class="hero-grid">
               {#each turnBosses as b (b.id)}
@@ -501,10 +511,11 @@
           class="turn-panel"
           class:mafia={turnLabel === 'MAFIA'}
           class:mafiax2={turnLabel === 'MAFIAx2'}
+          class:noturn={turnLabel === 'Tanpa Turn'}
         >
           <h3 class="turn-label">
             <span class="turn-dot"></span>
-            Turn {turnLabel}
+            {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : `Turn ${turnLabel}`}
             <span class="turn-count">{turnBosses.length}</span>
           </h3>
           <div class="card-grid">
@@ -525,18 +536,18 @@
 
   <section>
     <h2 class="section-title">Boss Mingguan (Jadwal Tetap)</h2>
-    {#if remainingWeekly.length === 0}
+    {#if weeklyTurnCards.length === 0}
       <p class="empty-hint">
         {#if searching}
           Tidak ada boss mingguan yang cocok.
         {:else}
-          Semua boss mingguan yang relevan sedang ditampilkan di atas.
+          Tidak ada data boss mingguan MAFIA / MAFIAx2.
         {/if}
       </p>
     {:else}
-      <div class="card-grid">
-        {#each remainingWeekly as boss (boss.id)}
-          <WeeklyCard {boss} {now} />
+      <div class="card-grid weekly-turn-grid">
+        {#each weeklyTurnCards as group (group.turn)}
+          <WeeklyCard turn={group.turn} bosses={group.bosses} {now} />
         {/each}
       </div>
     {/if}
@@ -938,10 +949,10 @@
     background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(20, 20, 30, 0.95) 55%);
     box-shadow: inset 3px 0 0 #a855f7;
   }
-  .turn-panel.mingguan {
-    border-color: rgba(240, 180, 40, 0.35);
-    background: linear-gradient(135deg, rgba(240, 180, 40, 0.1) 0%, rgba(20, 20, 30, 0.95) 55%);
-    box-shadow: inset 3px 0 0 #f0b428;
+  .turn-panel.noturn {
+    border-color: rgba(148, 163, 184, 0.35);
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(20, 20, 30, 0.95) 55%);
+    box-shadow: inset 3px 0 0 #94a3b8;
   }
   .turn-label {
     display: flex;
@@ -960,8 +971,8 @@
   .turn-panel.mafiax2 .turn-label {
     color: #e9d5ff;
   }
-  .turn-panel.mingguan .turn-label {
-    color: #f0b428;
+  .turn-panel.noturn .turn-label {
+    color: #cbd5e1;
   }
   .turn-dot {
     width: 9px;
@@ -978,9 +989,9 @@
     background: #a855f7;
     box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
   }
-  .turn-panel.mingguan .turn-dot {
-    background: #f0b428;
-    box-shadow: 0 0 10px rgba(240, 180, 40, 0.6);
+  .turn-panel.noturn .turn-dot {
+    background: #94a3b8;
+    box-shadow: 0 0 10px rgba(148, 163, 184, 0.5);
   }
   .turn-count {
     font-family: 'Inter', system-ui, sans-serif;
@@ -1003,6 +1014,9 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 12px;
+  }
+  .weekly-turn-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
 
   footer {

@@ -1,14 +1,22 @@
 <script>
-  import { nextSpawnFor, upcomingSchedules, dayName } from './weeklyBossData.js'
+  import { nextSpawnFor, dayName } from './weeklyBossData.js'
 
-  export let boss
+  export let turn
+  export let bosses = []
   export let now
 
-  $: nextSpawn = nextSpawnFor(boss, now)
-  $: msLeft = nextSpawn.getTime() - now.getTime()
+  $: rows = bosses
+    .map((boss) => {
+      const nextSpawn = nextSpawnFor(boss, now)
+      const msLeft = nextSpawn.getTime() - now.getTime()
+      return { boss, nextSpawn, msLeft }
+    })
+    .sort((a, b) => a.msLeft - b.msLeft)
+
+  $: next = rows[0]
+  $: msLeft = next?.msLeft ?? 0
   $: isSoon = msLeft <= 10 * 60 * 1000 && msLeft > 0
   $: isUp = msLeft <= 0
-  $: scheduleRows = upcomingSchedules(boss, now)
 
   function formatCountdown(ms) {
     if (ms <= 0) return 'SPAWN!'
@@ -20,25 +28,40 @@
   }
 
   function formatClock(date) {
-    return date.toLocaleTimeString('id-ID', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    })
+    return (
+      date.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }) + ' WIB'
+    )
   }
 </script>
 
-<article class="card" class:soon={isSoon} class:up={isUp}>
+<article
+  class="card"
+  class:soon={isSoon}
+  class:up={isUp}
+  class:turn-mafia={turn === 'MAFIA'}
+  class:turn-mafiax2={turn === 'MAFIAx2'}
+>
   <div class="top">
-    <h4>{boss.name}</h4>
-    <span class="next-hint">Next {dayName(nextSpawn.getDay())} {formatClock(nextSpawn)}</span>
+    <h4>{turn}</h4>
+    <span class="count">{bosses.length} boss</span>
   </div>
-  <div class="countdown">{formatCountdown(msLeft)}</div>
-  <ul class="schedule-list">
-    {#each scheduleRows as row, i (row.day + '-' + row.time)}
-      <li class:primary={i === 0} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
-        <span class="day">{dayName(row.day)} {row.time}</span>
-        <span class="row-countdown">{formatCountdown(row.msLeft)}</span>
+  {#if next}
+    <div class="next-boss">Next: {next.boss.name}</div>
+    <div class="countdown">{formatCountdown(msLeft)}</div>
+    <div class="details">
+      <span>Mingguan</span>
+      <span>{dayName(next.nextSpawn.getDay())} {formatClock(next.nextSpawn)}</span>
+    </div>
+  {/if}
+  <ul class="boss-list">
+    {#each rows as row (row.boss.id)}
+      <li class:active={row.boss.id === next?.boss.id} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
+        <span class="name">{row.boss.name}</span>
+        <span class="when">{dayName(row.nextSpawn.getDay())} {formatCountdown(row.msLeft)}</span>
       </li>
     {/each}
   </ul>
@@ -56,6 +79,14 @@
     gap: 8px;
     transition: border-color 0.2s, background 0.2s;
   }
+  .card.turn-mafia {
+    border-left-color: #3b82f6;
+    background: rgba(37, 99, 235, 0.1);
+  }
+  .card.turn-mafiax2 {
+    border-left-color: #a855f7;
+    background: rgba(147, 51, 234, 0.12);
+  }
   .card.soon {
     border-left-color: #f0b428;
     background: rgba(240, 180, 40, 0.06);
@@ -67,19 +98,24 @@
   .top {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 15px;
+    font-size: 16px;
     color: #f0eef7;
+    letter-spacing: 0.04em;
   }
-  .next-hint {
+  .count {
     font-size: 11px;
     color: #8a8aa0;
-    white-space: nowrap;
+  }
+  .next-boss {
+    font-size: 12px;
+    color: #c4b5fd;
+    font-weight: 500;
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
@@ -94,15 +130,22 @@
   .up .countdown {
     color: #ff6b6b;
   }
-  .schedule-list {
+  .details {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 11px;
+    color: #8a8aa0;
+  }
+  .boss-list {
     list-style: none;
-    margin: 0;
+    margin: 4px 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
   }
-  .schedule-list li {
+  .boss-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -113,23 +156,24 @@
     border-radius: 7px;
     background: rgba(255, 255, 255, 0.03);
   }
-  .schedule-list li.primary {
-    color: #d4c4ff;
+  .boss-list li.active {
+    color: #e8e4ff;
     background: rgba(124, 92, 200, 0.18);
     border: 1px solid rgba(160, 140, 224, 0.35);
   }
-  .schedule-list li.soon-row {
+  .boss-list li.soon-row {
     color: #f0b428;
     background: rgba(240, 180, 40, 0.1);
     border: 1px solid rgba(240, 180, 40, 0.35);
   }
-  .day {
+  .name {
     font-weight: 500;
   }
-  .row-countdown {
+  .when {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
+    white-space: nowrap;
   }
 </style>

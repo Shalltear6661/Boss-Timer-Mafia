@@ -97,18 +97,23 @@ export async function fetchIntervalBosses() {
 }
 
 export async function fetchWeeklyBosses() {
+  // A=Name, B=Turn, C=Day, D=Time
   const rows = await fetchRange('A30:D')
   const bossMap = {}
   for (const row of rows) {
     const name = (row[0] || '').trim()
     if (!name || name === 'Boss Name') continue
+    const rawTurn = (row[1] || '').trim()
+    const turn = !rawTurn || rawTurn === '-' ? '' : rawTurn
     const dayName = (row[2] || '').trim()
     const day = DAY_MAP[dayName.toLowerCase()]
     const time = parseTime12h(row[3] || '')
     if (day === undefined || !time) continue
     const id = name.toLowerCase().replace(/\s+/g, '-')
     if (!bossMap[id]) {
-      bossMap[id] = { id, name, schedules: [] }
+      bossMap[id] = { id, name, turn, schedules: [] }
+    } else if (!bossMap[id].turn && turn) {
+      bossMap[id].turn = turn
     }
     bossMap[id].schedules.push({ day, time })
   }

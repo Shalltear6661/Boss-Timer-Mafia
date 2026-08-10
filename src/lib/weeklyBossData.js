@@ -2,29 +2,30 @@
 // day mengikuti Date.getDay(): 0=Minggu, 1=Senin, ..., 6=Sabtu
 // time dalam format 24 jam "HH:mm", diasumsikan zona waktu sama dengan
 // browser yang menjalankan app ini (WIB).
+// turn: MAFIA / MAFIAx2 / '' (tanpa turn)
 
 export const weeklyBosses = [
-  { id: 'clemantis', name: 'Clemantis', schedules: [{ day: 1, time: '10:30' }, { day: 4, time: '18:00' }] },
-  { id: 'saphirus', name: 'Saphirus', schedules: [{ day: 0, time: '16:00' }, { day: 2, time: '10:30' }] },
-  { id: 'neutro', name: 'Neutro', schedules: [{ day: 2, time: '18:00' }, { day: 4, time: '10:30' }] },
-  { id: 'thymele', name: 'Thymele', schedules: [{ day: 1, time: '18:00' }, { day: 3, time: '10:30' }] },
-  { id: 'milavy', name: 'Milavy', schedules: [{ day: 6, time: '14:00' }] },
-  { id: 'ringor', name: 'Ringor', schedules: [{ day: 6, time: '16:00' }] },
-  { id: 'roderick', name: 'Roderick', schedules: [{ day: 5, time: '18:00' }] },
-  { id: 'auraq', name: 'Auraq', schedules: [{ day: 3, time: '20:00' }, { day: 5, time: '21:00' }] },
-  { id: 'chaiflock', name: 'Chaiflock', schedules: [{ day: 0, time: '14:00' }] },
-  { id: 'benji', name: 'Benji', schedules: [{ day: 0, time: '20:00' }] },
-  { id: 'libitina', name: 'Libitina', schedules: [{ day: 1, time: '20:00' }, { day: 6, time: '20:00' }] },
-  { id: 'rakajeth', name: 'Rakajeth', schedules: [{ day: 2, time: '21:00' }, { day: 0, time: '18:00' }] },
-  { id: 'icaruthia', name: 'Icaruthia', schedules: [{ day: 2, time: '21:00' }, { day: 5, time: '21:00' }] },
-  { id: 'motti', name: 'Motti', schedules: [{ day: 3, time: '19:00' }, { day: 6, time: '19:00' }] },
-  { id: 'nevaeh', name: 'Nevaeh', schedules: [{ day: 0, time: '22:00' }] },
-  { id: 'tumier', name: 'Tumier', schedules: [{ day: 0, time: '18:00' }] },
-  { id: 'lucus', name: 'Lucus', schedules: [{ day: 6, time: '22:00' }] },
-  { id: 'camalia', name: 'Camalia', schedules: [{ day: 4, time: '20:00' }] },
+  { id: 'clemantis', name: 'Clemantis', turn: 'MAFIAx2', schedules: [{ day: 1, time: '10:30' }, { day: 4, time: '18:00' }] },
+  { id: 'saphirus', name: 'Saphirus', turn: 'MAFIA', schedules: [{ day: 0, time: '16:00' }, { day: 2, time: '10:30' }] },
+  { id: 'neutro', name: 'Neutro', turn: 'MAFIA', schedules: [{ day: 2, time: '18:00' }, { day: 4, time: '10:30' }] },
+  { id: 'thymele', name: 'Thymele', turn: 'MAFIA', schedules: [{ day: 1, time: '18:00' }, { day: 3, time: '10:30' }] },
+  { id: 'milavy', name: 'Milavy', turn: 'MAFIA', schedules: [{ day: 6, time: '14:00' }] },
+  { id: 'ringor', name: 'Ringor', turn: 'MAFIA', schedules: [{ day: 6, time: '16:00' }] },
+  { id: 'roderick', name: 'Roderick', turn: 'MAFIA', schedules: [{ day: 5, time: '18:00' }] },
+  { id: 'auraq', name: 'Auraq', turn: 'MAFIA', schedules: [{ day: 3, time: '20:00' }, { day: 5, time: '21:00' }] },
+  { id: 'chaiflock', name: 'Chaiflock', turn: '', schedules: [{ day: 0, time: '14:00' }] },
+  { id: 'benji', name: 'Benji', turn: '', schedules: [{ day: 0, time: '20:00' }] },
+  { id: 'libitina', name: 'Libitina', turn: '', schedules: [{ day: 1, time: '20:00' }, { day: 6, time: '20:00' }] },
+  { id: 'rakajeth', name: 'Rakajeth', turn: '', schedules: [{ day: 2, time: '21:00' }, { day: 0, time: '18:00' }] },
+  { id: 'icaruthia', name: 'Icaruthia', turn: '', schedules: [{ day: 2, time: '21:00' }, { day: 5, time: '21:00' }] },
+  { id: 'motti', name: 'Motti', turn: '', schedules: [{ day: 3, time: '19:00' }, { day: 6, time: '19:00' }] },
+  { id: 'nevaeh', name: 'Nevaeh', turn: '', schedules: [{ day: 0, time: '22:00' }] },
+  { id: 'tumier', name: 'Tumier', turn: '', schedules: [{ day: 0, time: '18:00' }] },
+  { id: 'lucus', name: 'Lucus', turn: '', schedules: [{ day: 6, time: '22:00' }] },
+  { id: 'camalia', name: 'Camalia', turn: '', schedules: [{ day: 4, time: '20:00' }] },
 ]
 
-const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jumat", 'Sabtu']
+const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
 
 export function dayName(day) {
   return DAY_NAMES[day]
