@@ -32,8 +32,8 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
   const deathTime = formatDeathForSheet(deathDate)
 
   // Baca kolom nama untuk cari baris
-  const encodedSheet = encodeURIComponent(sheetName)
-  const readRange = `'${encodedSheet}'!A2:A`
+  const safeSheet = String(sheetName).replace(/'/g, "''")
+  const readRange = `'${safeSheet}'!A2:A`
   const readUrl =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
     `/values/${encodeURIComponent(readRange)}`
@@ -61,7 +61,7 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
 
   // Baris spreadsheet = index + 2 (header di baris 1)
   const sheetRow = rowIndex + 2
-  const writeRange = `'${sheetName}'!D${sheetRow}`
+  const writeRange = `'${safeSheet}'!D${sheetRow}`
   const writeUrl =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
     `/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`

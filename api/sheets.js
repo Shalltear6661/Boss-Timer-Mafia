@@ -28,10 +28,11 @@ async function fetchSheetValues(range) {
     throw new Error('Range tidak valid')
   }
 
-  const encodedSheet = encodeURIComponent(sheetName)
+  const safeSheet = String(sheetName).replace(/'/g, "''")
+  const a1 = `'${safeSheet}'!${range}`
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/'${encodedSheet}'!${range}?key=${encodeURIComponent(apiKey)}`
+    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
 
   const res = await fetch(url)
   if (!res.ok) {
