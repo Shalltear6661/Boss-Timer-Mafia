@@ -18,8 +18,10 @@
 
   const STORAGE_KEY = 'boss-timer-data-v3'
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v4'
+  const TURN_MIN_KEY = 'boss-timer-turn-min-v1'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
+  const MINIMIZED_BOSS_COUNT = 4
   // Service Account + share sheet sudah siap
   const ENABLE_MARK_KILLED = true
 
@@ -41,6 +43,36 @@
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
   let searchQuery = ''
+  let turnMinimized = loadTurnMinimized()
+
+  function loadTurnMinimized() {
+    try {
+      return JSON.parse(localStorage.getItem(TURN_MIN_KEY) || '{}') || {}
+    } catch {
+      return {}
+    }
+  }
+
+  function isTurnMinimized(key) {
+    return turnMinimized[key] !== false
+  }
+
+  function toggleTurnMinimized(key) {
+    turnMinimized = {
+      ...turnMinimized,
+      [key]: !isTurnMinimized(key),
+    }
+    try {
+      localStorage.setItem(TURN_MIN_KEY, JSON.stringify(turnMinimized))
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function visibleTurnBosses(list, key) {
+    if (!isTurnMinimized(key) || list.length <= MINIMIZED_BOSS_COUNT) return list
+    return list.slice(0, MINIMIZED_BOSS_COUNT)
+  }
 
   $: canEdit = ENABLE_MARK_KILLED && !!user.canEdit
   $: searchNeedle = searchQuery.trim().toLowerCase()
@@ -507,19 +539,33 @@
       </p>
     {:else}
       {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
+        {@const turnKey = 'field:' + turnLabel}
+        {@const minimized = isTurnMinimized(turnKey)}
+        {@const shownBosses = visibleTurnBosses(turnBosses, turnKey)}
         <div
           class="turn-panel"
           class:mafia={turnLabel === 'MAFIA'}
           class:mafiax2={turnLabel === 'MAFIAx2'}
           class:noturn={turnLabel === 'Tanpa Turn'}
+          class:minimized
         >
           <h3 class="turn-label">
             <span class="turn-dot"></span>
             {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : `Turn ${turnLabel}`}
             <span class="turn-count">{turnBosses.length}</span>
+            {#if turnBosses.length > MINIMIZED_BOSS_COUNT}
+              <button
+                type="button"
+                class="turn-toggle"
+                aria-expanded={!minimized}
+                on:click={() => toggleTurnMinimized(turnKey)}
+              >
+                {minimized ? `Tampilkan semua (${turnBosses.length})` : 'Minimize'}
+              </button>
+            {/if}
           </h3>
           <div class="card-grid">
-            {#each turnBosses as boss (boss.id)}
+            {#each shownBosses as boss (boss.id)}
               <BossCard
                 {boss}
                 {now}
@@ -529,6 +575,9 @@
               />
             {/each}
           </div>
+          {#if minimized && turnBosses.length > MINIMIZED_BOSS_COUNT}
+            <p class="min-hint">Menampilkan {MINIMIZED_BOSS_COUNT} dari {turnBosses.length} boss</p>
+          {/if}
         </div>
       {/each}
     {/if}
@@ -547,7 +596,14 @@
     {:else}
       <div class="card-grid weekly-turn-grid">
         {#each weeklyTurnCards as group (group.turn)}
-          <WeeklyCard turn={group.turn} bosses={group.bosses} {now} />
+          <WeeklyCard
+            turn={group.turn}
+            bosses={group.bosses}
+            {now}
+            minimized={isTurnMinimized('weekly:' + group.turn)}
+            minCount={MINIMIZED_BOSS_COUNT}
+            onToggleMinimize={() => toggleTurnMinimized('weekly:' + group.turn)}
+          />
         {/each}
       </div>
     {/if}
@@ -1004,6 +1060,26 @@
     border-radius: 999px;
     padding: 1px 8px;
     margin-left: 2px;
+  }
+  .turn-toggle {
+    margin-left: auto;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: inherit;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  .turn-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .min-hint {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: #8a8aa0;
   }
 
   section {

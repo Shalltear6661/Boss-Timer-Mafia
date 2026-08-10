@@ -4,6 +4,9 @@
   export let turn
   export let bosses = []
   export let now
+  export let minimized = true
+  export let minCount = 4
+  export let onToggleMinimize = null
 
   $: rows = bosses
     .map((boss) => {
@@ -17,6 +20,8 @@
   $: msLeft = next?.msLeft ?? 0
   $: isSoon = msLeft <= 10 * 60 * 1000 && msLeft > 0
   $: isUp = msLeft <= 0
+  $: canMinimize = rows.length > minCount
+  $: visibleRows = minimized && canMinimize ? rows.slice(0, minCount) : rows
 
   function formatCountdown(ms) {
     if (ms <= 0) return 'SPAWN!'
@@ -58,13 +63,23 @@
     </div>
   {/if}
   <ul class="boss-list">
-    {#each rows as row (row.boss.id)}
+    {#each visibleRows as row (row.boss.id)}
       <li class:active={row.boss.id === next?.boss.id} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
         <span class="name">{row.boss.name}</span>
         <span class="when">{dayName(row.nextSpawn.getDay())} {formatCountdown(row.msLeft)}</span>
       </li>
     {/each}
   </ul>
+  {#if canMinimize}
+    <button
+      type="button"
+      class="min-toggle"
+      aria-expanded={!minimized}
+      on:click={() => onToggleMinimize && onToggleMinimize()}
+    >
+      {minimized ? `Tampilkan semua (${rows.length})` : 'Minimize'}
+    </button>
+  {/if}
 </article>
 
 <style>
@@ -175,5 +190,20 @@
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
+  }
+  .min-toggle {
+    align-self: stretch;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #b8b8c8;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .min-toggle:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 </style>
