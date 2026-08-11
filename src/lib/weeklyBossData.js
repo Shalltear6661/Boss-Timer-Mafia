@@ -1,8 +1,9 @@
 // Boss dengan jadwal tetap mingguan (bukan berdasarkan interval/kematian).
 // day mengikuti Date.getDay(): 0=Minggu, 1=Senin, ..., 6=Sabtu
-// time dalam format 24 jam "HH:mm", diasumsikan zona waktu sama dengan
-// browser yang menjalankan app ini (WIB).
+// time "HH:mm" di zona sumber spreadsheet: Asia/Jakarta (WIB).
 // turn: MAFIA / MAFIAx2 / '' (tanpa turn)
+
+import { nextOccurrenceInZone, SOURCE_TZ, weekdayInZone } from './timezone.js'
 
 export const weeklyBosses = [
   { id: 'clemantis', name: 'Clemantis', turn: 'MAFIAx2', schedules: [{ day: 1, time: '10:30' }, { day: 4, time: '18:00' }] },
@@ -31,32 +32,27 @@ export function dayName(day) {
   return DAY_NAMES[day]
 }
 
-// Cari kemunculan berikutnya (>= now) dari sebuah jadwal {day, time}
-export function nextOccurrenceFor(schedule, now) {
-  const [h, m] = schedule.time.split(':').map(Number)
-  const candidate = new Date(now)
-  candidate.setHours(h, m, 0, 0)
-  const todayDay = now.getDay()
-  let diffDays = (schedule.day - todayDay + 7) % 7
-  if (diffDays === 0 && candidate.getTime() <= now.getTime()) {
-    diffDays = 7
-  }
-  candidate.setDate(candidate.getDate() + diffDays)
-  return candidate
+export function dayNameInZone(date, timeZone) {
+  return DAY_NAMES[weekdayInZone(date, timeZone)]
+}
+
+// Cari kemunculan berikutnya (>= now) dari sebuah jadwal {day, time} di WIB
+export function nextOccurrenceFor(schedule, now, sourceTz = SOURCE_TZ) {
+  return nextOccurrenceInZone(schedule, now, sourceTz)
 }
 
 // Ambil kemunculan paling dekat dari semua jadwal boss ini
-export function nextSpawnFor(boss, now) {
+export function nextSpawnFor(boss, now, sourceTz = SOURCE_TZ) {
   if (!boss?.schedules?.length) return new Date(now.getTime() + 7 * 24 * 3600 * 1000)
-  const times = boss.schedules.map((s) => nextOccurrenceFor(s, now).getTime())
+  const times = boss.schedules.map((s) => nextOccurrenceFor(s, now, sourceTz).getTime())
   return new Date(Math.min(...times))
 }
 
 /** Semua jadwal + next occurrence masing-masing, diurutkan yang paling dekat dulu */
-export function upcomingSchedules(boss, now) {
+export function upcomingSchedules(boss, now, sourceTz = SOURCE_TZ) {
   return (boss.schedules || [])
     .map((s) => {
-      const next = nextOccurrenceFor(s, now)
+      const next = nextOccurrenceFor(s, now, sourceTz)
       return { ...s, next, msLeft: next.getTime() - now.getTime() }
     })
     .sort((a, b) => a.msLeft - b.msLeft)

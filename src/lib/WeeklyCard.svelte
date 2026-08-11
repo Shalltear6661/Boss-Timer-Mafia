@@ -1,27 +1,14 @@
 <script>
-  import { nextSpawnFor, dayName } from './weeklyBossData.js'
+  import { nextSpawnFor, dayNameInZone } from './weeklyBossData.js'
 
   export let turn
   export let bosses = []
   export let now
+  export let timeZone = 'Asia/Jakarta'
+  export let tzLabel = 'WIB'
   export let minimized = true
   export let minCount = 4
   export let onToggleMinimize = null
-
-  $: rows = bosses
-    .map((boss) => {
-      const nextSpawn = nextSpawnFor(boss, now)
-      const msLeft = nextSpawn.getTime() - now.getTime()
-      return { boss, nextSpawn, msLeft }
-    })
-    .sort((a, b) => a.msLeft - b.msLeft)
-
-  $: next = rows[0]
-  $: msLeft = next?.msLeft ?? 0
-  $: isSoon = msLeft <= 10 * 60 * 1000 && msLeft > 0
-  $: isUp = msLeft <= 0
-  $: canMinimize = rows.length > minCount
-  $: visibleRows = minimized && canMinimize ? rows.slice(0, minCount) : rows
 
   function formatCountdown(ms) {
     if (ms <= 0) return 'SPAWN!'
@@ -32,15 +19,40 @@
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  function formatClock(date) {
+  function formatClock(date, zone, label) {
     return (
-      date.toLocaleTimeString('id-ID', {
+      new Date(date).toLocaleTimeString('id-ID', {
+        timeZone: zone,
         hour: '2-digit',
         minute: '2-digit',
         hour12: false,
-      }) + ' WIB'
+      }) +
+      ' ' +
+      label
     )
   }
+
+  $: rows = bosses
+    .map((boss) => {
+      const nextSpawn = nextSpawnFor(boss, now)
+      const msLeft = nextSpawn.getTime() - now.getTime()
+      return {
+        boss,
+        nextSpawn,
+        msLeft,
+        dayLabel: dayNameInZone(nextSpawn, timeZone),
+        clockLabel: formatClock(nextSpawn, timeZone, tzLabel),
+      }
+    })
+    .sort((a, b) => a.msLeft - b.msLeft)
+
+  $: next = rows[0]
+  $: msLeft = next?.msLeft ?? 0
+  $: isSoon = msLeft <= 10 * 60 * 1000 && msLeft > 0
+  $: isUp = msLeft <= 0
+  $: canMinimize = rows.length > minCount
+  $: visibleRows = minimized && canMinimize ? rows.slice(0, minCount) : rows
+  $: nextDetail = next ? `${next.dayLabel} ${next.clockLabel}` : ''
 </script>
 
 <article
@@ -59,14 +71,14 @@
     <div class="countdown">{formatCountdown(msLeft)}</div>
     <div class="details">
       <span>Mingguan</span>
-      <span>{dayName(next.nextSpawn.getDay())} {formatClock(next.nextSpawn)}</span>
+      <span>{nextDetail}</span>
     </div>
   {/if}
   <ul class="boss-list">
     {#each visibleRows as row (row.boss.id)}
       <li class:active={row.boss.id === next?.boss.id} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
         <span class="name">{row.boss.name}</span>
-        <span class="when">{dayName(row.nextSpawn.getDay())} {formatCountdown(row.msLeft)}</span>
+        <span class="when">{row.dayLabel} {row.clockLabel}</span>
       </li>
     {/each}
   </ul>

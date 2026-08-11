@@ -15,10 +15,18 @@
   import BossCard from './lib/BossCard.svelte'
   import WeeklyCard from './lib/WeeklyCard.svelte'
   import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
+  import {
+    TIMEZONE_OPTIONS,
+    getTimezoneOption,
+    formatTimeInZone,
+    formatDateInZone,
+  } from './lib/timezone.js'
+  import { dayNameInZone } from './lib/weeklyBossData.js'
 
   const STORAGE_KEY = 'boss-timer-data-v3'
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v4'
   const TURN_MIN_KEY = 'boss-timer-turn-min-v1'
+  const TZ_STORAGE_KEY = 'boss-timer-tz-v1'
   const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
   const MINIMIZED_BOSS_COUNT_MOBILE = 3
@@ -46,13 +54,37 @@
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
   let searchQuery = ''
   let turnMinimized = loadTurnMinimized()
+  let tzId = loadTzId()
   let isMobile =
     typeof window !== 'undefined' && window.matchMedia
       ? window.matchMedia(MOBILE_MQ).matches
       : true
   let mobileMq
 
+  $: tzOption = getTimezoneOption(tzId)
+  $: displayTimeZone = tzOption.tz
+  $: tzLabel = tzOption.short
   $: minimizedBossCount = isMobile ? MINIMIZED_BOSS_COUNT_MOBILE : MINIMIZED_BOSS_COUNT_DESKTOP
+
+  function loadTzId() {
+    try {
+      const saved = localStorage.getItem(TZ_STORAGE_KEY)
+      if (saved && TIMEZONE_OPTIONS.some((o) => o.id === saved)) return saved
+    } catch {
+      /* ignore */
+    }
+    return 'id'
+  }
+
+  function setTimezone(id) {
+    if (!TIMEZONE_OPTIONS.some((o) => o.id === id)) return
+    tzId = id
+    try {
+      localStorage.setItem(TZ_STORAGE_KEY, id)
+    } catch {
+      /* ignore */
+    }
+  }
 
   function loadTurnMinimized() {
     try {
@@ -306,6 +338,7 @@
       const days = (b.schedules || []).map((s) => dayNames[s.day]).join('/')
       const turn = (b.turn || '').trim()
       const turnPart = turn ? `${turn} · ` : ''
+      const nextLocal = `${dayNameInZone(nextSpawn, displayTimeZone)} ${formatTimeInZone(nextSpawn, displayTimeZone)} ${tzLabel}`
       return {
         id: 'wb-' + b.id,
         sourceId: b.id,
@@ -313,8 +346,8 @@
         name: b.name,
         turn,
         meta: days
-          ? `${turnPart}${days} · next ${dayNames[nextSpawn.getDay()]}`
-          : turnPart + 'Boss mingguan',
+          ? `${turnPart}${days} · next ${nextLocal}`
+          : `${turnPart}next ${nextLocal}`,
         msLeft,
         isUp: msLeft <= 0,
       }
@@ -408,9 +441,25 @@
       </div>
     </div>
     <div class="header-right">
+      <div class="tz-switch" role="group" aria-label="Zona waktu">
+        {#each TIMEZONE_OPTIONS as opt (opt.id)}
+          <button
+            type="button"
+            class="tz-btn"
+            class:active={tzId === opt.id}
+            on:click={() => setTimezone(opt.id)}
+            title={`${opt.label} (${opt.short})`}
+          >
+            {opt.label}
+          </button>
+        {/each}
+      </div>
       <div class="clock">
-        <div class="clock-time">{now.toLocaleTimeString('id-ID', { hour12: false })}</div>
-        <div class="clock-date">{now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+        <div class="clock-time">
+          {formatTimeInZone(now, displayTimeZone, { withSeconds: true })}
+          <span class="tz-tag">{tzLabel}</span>
+        </div>
+        <div class="clock-date">{formatDateInZone(now, displayTimeZone)}</div>
       </div>
       {#if ENABLE_MARK_KILLED}
         <div class="auth-box">
@@ -592,6 +641,8 @@
               <BossCard
                 {boss}
                 {now}
+                timeZone={displayTimeZone}
+                {tzLabel}
                 onMarkKilled={canEdit ? markKilled : null}
                 killing={killingId === boss.id}
                 showKill={canEdit}
@@ -623,6 +674,8 @@
             turn={group.turn}
             bosses={group.bosses}
             {now}
+            timeZone={displayTimeZone}
+            {tzLabel}
             minimized={isTurnMinimized('weekly:' + group.turn)}
             minCount={minimizedBossCount}
             onToggleMinimize={() => toggleTurnMinimized('weekly:' + group.turn)}
@@ -705,6 +758,39 @@
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
+  }
+  .tz-switch {
+    display: inline-flex;
+    padding: 3px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid #2a2a38;
+    gap: 2px;
+  }
+  .tz-btn {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: #8a8aa0;
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .tz-btn:hover {
+    color: #d8d8e6;
+  }
+  .tz-btn.active {
+    color: #0f0f17;
+    background: linear-gradient(135deg, #f0b428, #e0a020);
+  }
+  .tz-tag {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #f0b428;
+    letter-spacing: 0.04em;
   }
   .auth-box {
     display: flex;

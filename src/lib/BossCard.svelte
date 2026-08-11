@@ -1,6 +1,8 @@
 <script>
   export let boss
   export let now
+  export let timeZone = 'Asia/Jakarta'
+  export let tzLabel = 'WIB'
   export let onMarkKilled = null
   export let killing = false
   export let showKill = false
@@ -9,6 +11,7 @@
   $: msLeft = nextSpawn - now.getTime()
   $: isUp = msLeft <= 0
   $: isSoon = !isUp && msLeft <= 10 * 60 * 1000
+  $: nextClock = formatClock(nextSpawn, timeZone, tzLabel)
 
   function formatCountdown(ms) {
     if (ms <= 0) return 'SPAWN!'
@@ -19,10 +22,16 @@
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
-  function formatClock(date) {
+  function formatClock(date, zone, label) {
     return (
-      date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }) +
-      ' WIB'
+      new Date(date).toLocaleTimeString('id-ID', {
+        timeZone: zone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }) +
+      ' ' +
+      label
     )
   }
 </script>
@@ -46,7 +55,7 @@
   <div class="countdown">{formatCountdown(msLeft)}</div>
   <div class="details">
     <span>Interval {boss.spawnIntervalHours}j</span>
-    <span>Next {formatClock(new Date(nextSpawn))}</span>
+    <span>Next {nextClock}</span>
   </div>
   {#if showKill && onMarkKilled}
   <div class="actions">
