@@ -20,6 +20,7 @@
     getTimezoneOption,
     formatTimeInZone,
     formatDateInZone,
+    zonedTimeToUtc,
   } from './lib/timezone.js'
   import { dayNameInZone } from './lib/weeklyBossData.js'
 
@@ -44,6 +45,66 @@
   let syncing = false
   let killingId = null
   let killError = ''
+  let killTarget = null
+  let killDate = ''
+  let killTime = ''
+
+  function openKillForm(boss) {
+    const pad = (n) => String(n).padStart(2, '0')
+    const d = new Date()
+    const local = new Intl.DateTimeFormat('en-CA', {
+      timeZone: displayTimeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d)
+    killDate = local
+    const timeParts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: displayTimeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(d)
+    const hh = timeParts.find((p) => p.type === 'hour')?.value || '00'
+    const mm = timeParts.find((p) => p.type === 'minute')?.value || '00'
+    killTime = `${hh}:${mm}`
+    killTarget = boss
+  }
+
+  function closeKillForm() {
+    killTarget = null
+  }
+
+  function confirmKill() {
+    if (!killTarget || !killDate || !killTime) return
+    const [year, month, day] = killDate.split('-').map(Number)
+    const [hour, minute] = killTime.split(':').map(Number)
+    const deathDate = zonedTimeToUtc({ year, month, day, hour, minute }, displayTimeZone)
+    const target = killTarget
+    killingId = target.id
+    killError = ''
+    markKilledFromModal(target, deathDate)
+  }
+
+  async function markKilledFromModal(boss, deathDate) {
+    if (!boss?.name) return
+    try {
+      const deathISO = deathDate.toISOString()
+      await markBossKilled(boss.name, deathISO)
+      bosses = bosses.map((b) =>
+        b.id === boss.id ? { ...b, lastDeath: deathDate } : b
+      )
+      persist()
+      await syncFromSpreadsheet()
+      killTarget = null // sukses → tutup modal
+    } catch (e) {
+      console.error(e)
+      killError = e.message || 'Gagal menyimpan ke spreadsheet'
+    } finally {
+      killingId = null
+    }
+  }
+
   let user = { authenticated: false, canEdit: false, email: '', name: '', picture: '' }
   let authReady = false
   let googleClientId = ''
@@ -200,7 +261,7 @@
     await syncFromSpreadsheet()
   }
 
-  async function markKilled(boss) {
+  async function markKilled(boss, deathDate) {
     if (!canEdit) {
       killError = 'Login sebagai Editor untuk menandai mati'
       return
@@ -209,8 +270,11 @@
     killingId = boss.id
     killError = ''
     try {
-      await markBossKilled(boss.name)
-      bosses = bosses.map((b) => (b.id === boss.id ? { ...b, lastDeath: new Date() } : b))
+      const deathISO = deathDate ? deathDate.toISOString() : new Date().toISOString()
+      await markBossKilled(boss.name, deathISO)
+      bosses = bosses.map((b) =>
+        b.id === boss.id ? { ...b, lastDeath: deathDate || new Date() } : b
+      )
       persist()
       await syncFromSpreadsheet()
     } catch (e) {
@@ -536,8 +600,8 @@
                   canMarkKilled={canEdit && b.type === 'interval'}
                   killing={killingId === b.sourceId}
                   onMarkKilled={() => {
-                    const boss = bosses.find((x) => x.id === b.sourceId)
-                    if (boss) markKilled(boss)
+                    const src = bosses.find((x) => x.id === b.sourceId)
+                    if (src) openKillForm(src)
                   }}
                 />
               {/each}
@@ -550,6 +614,32 @@
 
   {#if killError}
     <div class="kill-error">{killError}</div>
+  {/if}
+
+  {#if killTarget}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <div class="kill-modal-overlay" on:click={closeKillForm} on:keydown={(e) => e.key === 'Escape' && closeKillForm()} role="dialog" aria-modal="true" aria-label="Input tanggal dan jam kematian">
+    <div class="kill-modal" on:click|stopPropagation>
+      <h3 class="modal-title">Tandai Mati — {killTarget.name}</h3>
+      <p class="modal-hint">Masukkan tanggal dan jam boss mati (sesuaikan zona waktu {tzLabel})</p>
+      <div class="modal-fields">
+        <label class="modal-label">
+          <span>Tanggal</span>
+          <input type="date" class="modal-input" bind:value={killDate} />
+        </label>
+        <label class="modal-label">
+          <span>Jam</span>
+          <input type="time" class="modal-input" bind:value={killTime} />
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" on:click={closeKillForm}>Batal</button>
+        <button class="modal-confirm" on:click={confirmKill} disabled={killingId || !killDate || !killTime}>
+          {killingId ? 'Menyimpan...' : 'Konfirmasi'}
+        </button>
+      </div>
+    </div>
+  </div>
   {/if}
 
   {#if ENABLE_MARK_KILLED && !user.authenticated}
@@ -643,7 +733,7 @@
                 {now}
                 timeZone={displayTimeZone}
                 {tzLabel}
-                onMarkKilled={canEdit ? markKilled : null}
+                onMarkKilled={canEdit ? (boss) => openKillForm(boss) : null}
                 killing={killingId === boss.id}
                 showKill={canEdit}
               />
@@ -1232,6 +1322,101 @@
   }
   .link:hover:not(:disabled) {
     color: #9a9ab0;
+  }
+
+  /* Modal kill */
+  .kill-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .kill-modal {
+    background: #1e1e2e;
+    border: 1px solid #2a2a38;
+    border-radius: 16px;
+    padding: 24px;
+    width: 340px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  }
+  .modal-title {
+    margin: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    color: #f0eef7;
+  }
+  .modal-hint {
+    margin: 0;
+    font-size: 12px;
+    color: #8a8aa0;
+    line-height: 1.4;
+  }
+  .modal-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .modal-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: #a8a8b8;
+  }
+  .modal-input {
+    background: #12121c;
+    border: 1px solid #3a3a52;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #f0eef7;
+  }
+  .modal-input:focus {
+    outline: none;
+    border-color: #6a5acd;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .modal-cancel,
+  .modal-confirm {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+  .modal-cancel {
+    background: #2a2a38;
+    color: #a8a8b8;
+  }
+  .modal-cancel:hover {
+    background: #3a3a4a;
+  }
+  .modal-confirm {
+    background: #d13a3a;
+    color: #fff;
+  }
+  .modal-confirm:hover:not(:disabled) {
+    background: #e04a4a;
+  }
+  .modal-confirm:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   @media (prefers-reduced-motion: reduce) {

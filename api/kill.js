@@ -46,8 +46,10 @@ export default async function handler(req, res) {
       res.end(JSON.stringify({ error: 'Field name wajib' }))
       return
     }
+    const deathISO = body.deathTime || body.deathDate || null
+    const deathDate = deathISO ? new Date(deathISO) : new Date()
 
-    const result = await markBossKilledOnSheet(String(name), process.env)
+    const result = await markBossKilledOnSheet(String(name), process.env, deathDate)
     res.statusCode = 200
     res.end(JSON.stringify({ ok: true, ...result, by: session.email }))
   } catch (e) {

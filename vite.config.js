@@ -141,7 +141,9 @@ function sheetsApiPlugin(env) {
           sendJson(res, 400, { error: 'Field name wajib' })
           return
         }
-        const result = await markBossKilledOnSheet(String(name), env)
+        const deathISO = body.deathTime || body.deathDate || null
+        const deathDate = deathISO ? new Date(deathISO) : new Date()
+        const result = await markBossKilledOnSheet(String(name), env, deathDate)
         sendJson(res, 200, { ok: true, ...result, by: session.email })
       } catch (e) {
         console.error('[kill-proxy]', e)

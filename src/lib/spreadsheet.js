@@ -14,12 +14,12 @@ async function fetchRange(range) {
 }
 
 /** Tandai boss mati → update Time of Death di spreadsheet (OAuth akun pribadi) */
-export async function markBossKilled(name) {
+export async function markBossKilled(name, deathISO) {
   const res = await fetch('/api/kill', {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, deathTime: deathISO }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
