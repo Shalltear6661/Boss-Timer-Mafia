@@ -10,6 +10,13 @@ import {
   getSessionFromRequest,
   isEditorEmail,
 } from './server/session.js'
+import { getVapidKeys, sendPushToMany } from './server/push.js'
+import {
+  upsertPushSubscription,
+  removePushSubscription,
+  listPushSubscriptions,
+} from './server/pushStore.js'
+import { loadWatchList, collectDueNotifications } from './server/bossSchedule.js'
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -148,6 +155,111 @@ function sheetsApiPlugin(env) {
       } catch (e) {
         console.error('[kill-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Gagal update spreadsheet' })
+      }
+      return
+    }
+
+    // --- Web Push ---
+    if (url.startsWith('/api/push-vapid') && req.method === 'GET') {
+      const { publicKey } = getVapidKeys(env)
+      if (!publicKey) {
+        sendJson(res, 500, { error: 'VAPID_PUBLIC_KEY belum di-set' })
+        return
+      }
+      sendJson(res, 200, { vapidPublicKey: publicKey })
+      return
+    }
+
+    if (url.startsWith('/api/push-subscribe')) {
+      try {
+        const { publicKey } = getVapidKeys(env)
+        if (!publicKey) {
+          sendJson(res, 500, { error: 'VAPID keys belum di-set' })
+          return
+        }
+        if (req.method === 'GET') {
+          sendJson(res, 200, { vapidPublicKey: publicKey })
+          return
+        }
+        const body = await readJsonBody(req)
+        const subscription = body.subscription
+        const fakeReq = { headers: { cookie: req.headers.cookie || '' } }
+        const session = getSessionFromRequest(fakeReq, env)
+        const email = session?.email || body.email || ''
+
+        if (req.method === 'DELETE' || body.action === 'unsubscribe') {
+          if (!subscription?.endpoint) {
+            sendJson(res, 400, { error: 'endpoint wajib' })
+            return
+          }
+          const result = await removePushSubscription(subscription.endpoint, env)
+          sendJson(res, 200, { ok: true, ...result })
+          return
+        }
+
+        if (req.method !== 'POST') {
+          sendJson(res, 405, { error: 'Method not allowed' })
+          return
+        }
+        if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+          sendJson(res, 400, { error: 'Subscription tidak lengkap' })
+          return
+        }
+        const result = await upsertPushSubscription(subscription, email, env)
+        sendJson(res, 200, { ok: true, vapidPublicKey: publicKey, ...result })
+      } catch (e) {
+        console.error('[push-subscribe-proxy]', e)
+        sendJson(res, 500, { error: e.message || 'Gagal subscribe' })
+      }
+      return
+    }
+
+    if (url.startsWith('/api/cron-push') && (req.method === 'GET' || req.method === 'POST')) {
+      try {
+        const secret = env.CRON_SECRET || ''
+        const parsed = new URL(url, 'http://localhost')
+        const q = parsed.searchParams.get('secret') || ''
+        if (!secret || q !== secret) {
+          sendJson(res, 401, { error: 'Unauthorized cron' })
+          return
+        }
+        const now = new Date()
+        const items = await loadWatchList(env, now)
+        const due = collectDueNotifications(items)
+        if (due.length === 0) {
+          sendJson(res, 200, { ok: true, due: 0, sent: 0, skipped: 'no milestones' })
+          return
+        }
+        const subs = await listPushSubscriptions(env)
+        if (subs.length === 0) {
+          sendJson(res, 200, { ok: true, due: due.length, sent: 0, skipped: 'no subscribers' })
+          return
+        }
+        let totalOk = 0
+        let totalFail = 0
+        for (const payload of due) {
+          const result = await sendPushToMany(subs, payload, env)
+          totalOk += result.ok
+          totalFail += result.failed
+          for (const ep of result.expiredEndpoints || []) {
+            try {
+              await removePushSubscription(ep, env)
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+        sendJson(res, 200, {
+          ok: true,
+          due: due.length,
+          subscribers: subs.length,
+          totalOk,
+          totalFail,
+          at: now.toISOString(),
+        })
+      } catch (e) {
+        console.error('[cron-push-proxy]', e)
+        sendJson(res, 500, { error: e.message || 'Cron push gagal' })
       }
       return
     }

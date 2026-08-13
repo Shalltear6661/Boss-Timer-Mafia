@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "auth:google": "node scripts/get-refresh-token.mjs",
     "sa:env": "node scripts/sa-to-env.mjs",
-    "sa:test": "node scripts/sa-test.mjs"
+    "sa:test": "node scripts/sa-test.mjs",
+    "generate:vapid": "node scripts/generate-vapid.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.1",
@@ -17,6 +18,7 @@
     "vite": "^5.3.1"
   },
   "dependencies": {
-    "@vercel/analytics": "^2.0.1"
+    "@vercel/analytics": "^2.0.1",
+    "web-push": "^3.6.7"
   }
 }

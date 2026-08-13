@@ -123,6 +123,24 @@ export async function ensureNotificationPermission() {
   return granted
 }
 
+/**
+ * Permission + subscribe Web Push (agar notif tetap muncul saat browser minimize).
+ * Import dinamis supaya tidak memecah build jika push gagal.
+ */
+export async function enableNotificationsWithPush() {
+  const granted = await ensureNotificationPermission()
+  if (!granted) return { granted: false, push: false }
+  try {
+    const { subscribeToPush, isPushSupported } = await import('./push.js')
+    if (!isPushSupported()) return { granted: true, push: false }
+    const sub = await subscribeToPush()
+    return { granted: true, push: !!sub }
+  } catch (e) {
+    console.warn('Push subscribe gagal:', e)
+    return { granted: true, push: false }
+  }
+}
+
 function markFired(bossId, milestone) {
   if (!notified.has(bossId)) notified.set(bossId, new Set())
   notified.get(bossId).add(milestone)

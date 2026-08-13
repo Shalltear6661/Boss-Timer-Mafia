@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
-  import { ensureNotificationPermission, checkAndNotify, unlockAudio, isNotificationGranted } from './lib/notifications.js'
+  import { ensureNotificationPermission, checkAndNotify, unlockAudio, isNotificationGranted, enableNotificationsWithPush } from './lib/notifications.js'
   import {
     getAuthConfig,
     fetchMe,
@@ -113,6 +113,11 @@
   let notifSupported = typeof Notification !== 'undefined'
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+  let pushEnabled = false
+  let pushSupported =
+    typeof window !== 'undefined' &&
+    'serviceWorker' in navigator &&
+    'PushManager' in window
   let searchQuery = ''
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
@@ -462,6 +467,18 @@
     if (ENABLE_MARK_KILLED) initAuth()
     else authReady = true
     notifEnabled = isNotificationGranted()
+    // Re-subscribe push jika permission sudah granted (refresh / reopen)
+    if (notifEnabled && pushSupported) {
+      import('./lib/push.js')
+        .then(({ subscribeToPush, isPushSubscribedLocally }) => {
+          pushEnabled = isPushSubscribedLocally()
+          return subscribeToPush()
+        })
+        .then((sub) => {
+          pushEnabled = !!sub
+        })
+        .catch(() => {})
+    }
     if (typeof window !== 'undefined' && window.matchMedia) {
       mobileMq = window.matchMedia(MOBILE_MQ)
       isMobile = mobileMq.matches
@@ -661,13 +678,31 @@
 
   {#if !notifEnabled && notifSupported}
     <div class="notif-banner">
-      <span>Aktifkan notifikasi + suara untuk peringatan 10 menit, 5 menit, dan saat spawn.</span>
+      <span>
+        Aktifkan notifikasi + Web Push agar peringatan 10 menit / 5 menit / spawn tetap muncul
+        meski browser di-minimize (mobile).
+      </span>
       <button
         on:click={async () => {
-          notifEnabled = await ensureNotificationPermission()
+          const result = await enableNotificationsWithPush()
+          notifEnabled = result.granted
+          pushEnabled = result.push
         }}
       >
-        Izinkan Notifikasi & Suara
+        Izinkan Notifikasi & Push
+      </button>
+    </div>
+  {:else if notifEnabled && pushSupported && !pushEnabled}
+    <div class="notif-banner">
+      <span>Notifikasi lokal aktif. Aktifkan Web Push agar tetap jalan saat app di-minimize.</span>
+      <button
+        on:click={async () => {
+          const result = await enableNotificationsWithPush()
+          notifEnabled = result.granted
+          pushEnabled = result.push
+        }}
+      >
+        Aktifkan Web Push
       </button>
     </div>
   {/if}
@@ -1439,6 +1474,16 @@
   .modal-confirm:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  @media (max-width: 719px) {
+    .clock {
+      text-align: center;
+      width: 100%;
+    }
+    .header-right {
+      justify-content: center;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
