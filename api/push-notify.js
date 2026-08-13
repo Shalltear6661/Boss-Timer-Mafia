@@ -71,7 +71,7 @@ export default async function handler(req, res) {
       title,
       body: text,
       tag: tag || 'boss-timer',
-      vibrate: [200, 100, 200],
+      vibrate: [300, 100, 300, 100, 500],
     }
 
     const result = await sendPushToMany(list, payload, process.env)

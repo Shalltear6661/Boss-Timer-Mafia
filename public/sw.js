@@ -30,8 +30,9 @@ self.addEventListener('push', (event) => {
     badge: data.badge || '/favicon.ico',
     tag: data.tag || 'boss-timer',
     renotify: true,
-    vibrate: data.vibrate || [200, 100, 200],
+    vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
+    silent: false,
     data: { url: '/' },
   }
 

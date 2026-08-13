@@ -196,7 +196,7 @@ export function collectDueNotifications(items) {
           title: m.title,
           body: m.body(item.name),
           tag: `boss-${item.id}-${m.id}`,
-          vibrate: [200, 100, 200],
+          vibrate: [300, 100, 300, 100, 500],
         })
       }
     }

@@ -55,25 +55,36 @@ export async function unlockAudio() {
  * @param {number} startAt detik relatif ke ctx.currentTime
  * @param {number} duration detik
  * @param {number} volume 0-1
+ * @param {'sine'|'square'|'sawtooth'|'triangle'} [type]
  */
-function beep(freq, startAt, duration, volume = 0.22) {
+function beep(freq, startAt, duration, volume = 0.55, type = 'square') {
   const ctx = getAudioContext()
   if (!ctx || ctx.state !== 'running') return
 
   const osc = ctx.createOscillator()
   const gain = ctx.createGain()
-  osc.type = 'sine'
+  // Soft-clip: compressor biar keras tapi tidak pecah total
+  const compressor = ctx.createDynamicsCompressor()
+  compressor.threshold.setValueAtTime(-18, startAt)
+  compressor.knee.setValueAtTime(8, startAt)
+  compressor.ratio.setValueAtTime(6, startAt)
+  compressor.attack.setValueAtTime(0.003, startAt)
+  compressor.release.setValueAtTime(0.12, startAt)
+
+  osc.type = type
   osc.frequency.value = freq
+  const peak = Math.min(0.9, Math.max(0.05, volume))
   gain.gain.setValueAtTime(0.0001, startAt)
-  gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.02)
+  gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.015)
   gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration)
   osc.connect(gain)
-  gain.connect(ctx.destination)
+  gain.connect(compressor)
+  compressor.connect(ctx.destination)
   osc.start(startAt)
-  osc.stop(startAt + duration + 0.02)
+  osc.stop(startAt + duration + 0.03)
 }
 
-/** Pola suara berbeda per milestone */
+/** Pola suara berbeda per milestone — volume tinggi + waveform tajam */
 function playAlertSound(milestoneId) {
   const ctx = getAudioContext()
   if (!ctx) return
@@ -85,21 +96,25 @@ function playAlertSound(milestoneId) {
 
   const t = ctx.currentTime
   if (milestoneId === '10') {
-    // 2 beep sedang
-    beep(660, t, 0.18, 0.2)
-    beep(660, t + 0.28, 0.18, 0.2)
+    // 3 beep keras
+    beep(740, t, 0.22, 0.7)
+    beep(740, t + 0.3, 0.22, 0.7)
+    beep(880, t + 0.6, 0.28, 0.75)
   } else if (milestoneId === '5') {
-    // 3 beep lebih tinggi
-    beep(880, t, 0.15, 0.22)
-    beep(880, t + 0.22, 0.15, 0.22)
-    beep(988, t + 0.44, 0.22, 0.25)
+    // 4 beep lebih agresif
+    beep(880, t, 0.2, 0.75)
+    beep(880, t + 0.26, 0.2, 0.75)
+    beep(988, t + 0.52, 0.22, 0.8)
+    beep(1175, t + 0.8, 0.3, 0.85)
   } else if (milestoneId === 'spawn') {
-    // Alarm tegas: naik turun berulang
-    beep(523, t, 0.16, 0.28)
-    beep(784, t + 0.18, 0.16, 0.28)
-    beep(523, t + 0.36, 0.16, 0.28)
-    beep(784, t + 0.54, 0.16, 0.28)
-    beep(1046, t + 0.72, 0.35, 0.32)
+    // Alarm keras: naik-turun cepat + peak tinggi
+    beep(523, t, 0.18, 0.8)
+    beep(784, t + 0.2, 0.18, 0.8)
+    beep(523, t + 0.4, 0.18, 0.85)
+    beep(784, t + 0.6, 0.18, 0.85)
+    beep(1046, t + 0.8, 0.22, 0.9)
+    beep(1319, t + 1.05, 0.22, 0.9)
+    beep(1568, t + 1.3, 0.45, 0.9)
   }
 }
 
