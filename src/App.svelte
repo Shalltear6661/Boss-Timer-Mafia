@@ -501,6 +501,28 @@
       <span class="brand-mark">◈</span>
       <div>
         <h1>Mafia Timer</h1>
+        <div class="brand-status">
+          <button
+            class="spreadsheet-status"
+            class:live={spreadsheetStatus === 'live'}
+            class:cache={spreadsheetStatus === 'cache'}
+            class:loading={spreadsheetStatus === 'loading'}
+            on:click={refreshFromSpreadsheet}
+            title="Klik untuk refresh dari spreadsheet"
+            disabled={syncing}
+          >
+            {#if spreadsheetStatus === 'loading'}
+              <span class="dot loading-dot"></span>
+              <span class="label">Memuat...</span>
+            {:else if spreadsheetStatus === 'live'}
+              <span class="dot live-dot"></span>
+              <span class="label">Spreadsheet</span>
+            {:else}
+              <span class="dot cache-dot"></span>
+              <span class="label">Lokal</span>
+            {/if}
+          </button>
+        </div>
         <h2 class="tagline">Bersama MOJO kita kuasai LORDNINE</h2>
       </div>
     </div>
@@ -517,13 +539,6 @@
             {opt.label}
           </button>
         {/each}
-      </div>
-      <div class="clock">
-        <div class="clock-time">
-          {formatTimeInZone(now, displayTimeZone, { withSeconds: true })}
-          <span class="tz-tag">{tzLabel}</span>
-        </div>
-        <div class="clock-date">{formatDateInZone(now, displayTimeZone)}</div>
       </div>
       {#if ENABLE_MARK_KILLED}
         <div class="auth-box">
@@ -547,26 +562,13 @@
           {/if}
         </div>
       {/if}
-      <button
-        class="spreadsheet-status"
-        class:live={spreadsheetStatus === 'live'}
-        class:cache={spreadsheetStatus === 'cache'}
-        class:loading={spreadsheetStatus === 'loading'}
-        on:click={refreshFromSpreadsheet}
-        title="Klik untuk refresh dari spreadsheet"
-        disabled={syncing}
-      >
-        {#if spreadsheetStatus === 'loading'}
-          <span class="dot loading-dot"></span>
-          <span class="label">Memuat...</span>
-        {:else if spreadsheetStatus === 'live'}
-          <span class="dot live-dot"></span>
-          <span class="label">Spreadsheet</span>
-        {:else}
-          <span class="dot cache-dot"></span>
-          <span class="label">Lokal</span>
-        {/if}
-      </button>
+      <div class="clock">
+        <div class="clock-time">
+          {formatTimeInZone(now, displayTimeZone, { withSeconds: true })}
+          <span class="tz-tag">{tzLabel}</span>
+        </div>
+        <div class="clock-date">{formatDateInZone(now, displayTimeZone)}</div>
+      </div>
     </div>
   </header>
 
@@ -840,6 +842,58 @@
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 500;
   }
+  .brand-status {
+    margin: 4px 0 2px;
+  }
+  .brand-status .spreadsheet-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: #7a7a90;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #181825;
+    border: 1px solid #2a2a38;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .brand-status .spreadsheet-status:hover:not(:disabled) {
+    border-color: #4a4a68;
+  }
+  .brand-status .spreadsheet-status:disabled {
+    opacity: 0.7;
+    cursor: wait;
+  }
+  .brand-status .spreadsheet-status.live {
+    border-color: #2a6a3a;
+    color: #7fc88a;
+  }
+  .brand-status .spreadsheet-status.cache {
+    border-color: #6a5a2a;
+    color: #c8b87f;
+  }
+  .brand-status .spreadsheet-status.loading {
+    border-color: #3a3a5a;
+    color: #9a9ab0;
+  }
+  .brand-status .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+  .brand-status .live-dot {
+    background: #4ade80;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.5);
+  }
+  .brand-status .cache-dot {
+    background: #f0b428;
+    box-shadow: 0 0 6px rgba(240, 180, 40, 0.4);
+  }
+  .brand-status .loading-dot {
+    background: #7a7a90;
+    animation: pulse 1s ease-in-out infinite;
+  }
   .clock {
     text-align: right;
   }
@@ -979,38 +1033,6 @@
     text-transform: capitalize;
   }
 
-  .spreadsheet-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: #7a7a90;
-    padding: 4px 10px;
-    border-radius: 20px;
-    background: #181825;
-    border: 1px solid #2a2a38;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .spreadsheet-status:hover:not(:disabled) {
-    border-color: #4a4a68;
-  }
-  .spreadsheet-status:disabled {
-    opacity: 0.7;
-    cursor: wait;
-  }
-  .spreadsheet-status.live {
-    border-color: #2a6a3a;
-    color: #7fc88a;
-  }
-  .spreadsheet-status.cache {
-    border-color: #6a5a2a;
-    color: #c8b87f;
-  }
-  .spreadsheet-status.loading {
-    border-color: #3a3a5a;
-    color: #9a9ab0;
-  }
   .dot {
     width: 7px;
     height: 7px;
