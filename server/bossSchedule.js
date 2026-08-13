@@ -164,7 +164,7 @@ export async function loadWatchList(env = process.env, now = new Date()) {
 }
 
 /**
- * Window sempit (~1 menit) agar cron * * * * * hanya fire sekali per milestone.
+ * Window sempit (~1 menit) agar cron eksternal (tiap menit) hanya fire sekali per milestone.
  */
 export const PUSH_MILESTONES = [
   {

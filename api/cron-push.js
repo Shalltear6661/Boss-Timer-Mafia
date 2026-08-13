@@ -9,17 +9,13 @@ function authorized(req, env) {
   const q = url.searchParams.get('secret') || ''
   const header = req.headers?.authorization || ''
   const bearer = header.startsWith('Bearer ') ? header.slice(7) : ''
-  // Vercel Cron mengirim header Authorization: Bearer <CRON_SECRET> jika di-set,
-  // atau kita cek query ?secret=
-  const vercelCron = req.headers?.['x-vercel-cron']
-  if (vercelCron && secret) return true
   return q === secret || bearer === secret
 }
 
 /**
  * GET|POST /api/cron-push
- * Dipanggil Vercel Cron / cron eksternal tiap menit.
- * Cek milestone boss → kirim Web Push ke semua subscription di sheet PushSubs.
+ * Dipanggil cron eksternal (mis. cron-job.org) tiap menit.
+ * Auth: ?secret=CRON_SECRET atau Authorization: Bearer CRON_SECRET
  */
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json')
