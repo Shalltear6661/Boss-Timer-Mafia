@@ -14,7 +14,6 @@
   } from './lib/auth.js'
   import BossCard from './lib/BossCard.svelte'
   import WeeklyCard from './lib/WeeklyCard.svelte'
-  import SpawnSoonCard from './lib/SpawnSoonCard.svelte'
   import {
     TIMEZONE_OPTIONS,
     getTimezoneOption,
@@ -22,13 +21,11 @@
     formatDateInZone,
     zonedTimeToUtc,
   } from './lib/timezone.js'
-  import { dayNameInZone } from './lib/weeklyBossData.js'
 
   const STORAGE_KEY = 'boss-timer-data-v3'
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v4'
   const TURN_MIN_KEY = 'boss-timer-turn-min-v1'
   const TZ_STORAGE_KEY = 'boss-timer-tz-v1'
-  const SOON_WINDOW = 10 * 60 * 1000 // tampilkan di hero mulai 10 menit sebelum spawn
   const SYNC_INTERVAL_MS = 60 * 1000
   const MINIMIZED_BOSS_COUNT_MOBILE = 3
   const MINIMIZED_BOSS_COUNT_DESKTOP = 4
@@ -381,55 +378,6 @@
     return nextSpawnFor(a, now).getTime() - nextSpawnFor(b, now).getTime()
   })
 
-  // Boss yang segera spawn (<=10 menit) atau sudah waktunya — selalu di atas (hero sticky)
-  $: soonList = [
-    ...sortedBosses.map((b) => {
-      const nextSpawn = b.lastDeath.getTime() + b.spawnIntervalHours * 3600 * 1000
-      const msLeft = nextSpawn - now.getTime()
-      const turn = (b.turn || '').trim()
-      return {
-        id: 'ib-' + b.id,
-        sourceId: b.id,
-        type: 'interval',
-        name: b.name,
-        turn,
-        meta: turn
-          ? `${turn} · Lv ${b.level} · interval ${b.spawnIntervalHours}j`
-          : `Lv ${b.level} · interval ${b.spawnIntervalHours}j`,
-        msLeft,
-        isUp: msLeft <= 0,
-      }
-    }),
-    ...sortedWeeklyBosses.map((b) => {
-      const nextSpawn = nextSpawnFor(b, now)
-      const msLeft = nextSpawn.getTime() - now.getTime()
-      const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-      const days = (b.schedules || []).map((s) => dayNames[s.day]).join('/')
-      const turn = (b.turn || '').trim()
-      const turnPart = turn ? `${turn} · ` : ''
-      const nextLocal = `${dayNameInZone(nextSpawn, displayTimeZone)} ${formatTimeInZone(nextSpawn, displayTimeZone)} ${tzLabel}`
-      return {
-        id: 'wb-' + b.id,
-        sourceId: b.id,
-        type: 'weekly',
-        name: b.name,
-        turn,
-        meta: days
-          ? `${turnPart}${days} · next ${nextLocal}`
-          : `${turnPart}next ${nextLocal}`,
-        msLeft,
-        isUp: msLeft <= 0,
-      }
-    }),
-  ]
-    .filter((b) => b.isUp || b.msLeft <= SOON_WINDOW)
-    .sort((a, b) => a.msLeft - b.msLeft)
-
-  // ID boss yang sudah di hero — jangan duplikat di list bawah
-  $: soonIds = new Set(soonList.map((b) => `${b.type}:${b.sourceId}`))
-  $: remainingBosses = sortedBosses.filter(
-    (b) => !soonIds.has('interval:' + b.id) && matchesSearch(b.name)
-  )
   $: weeklyTurnCards = ['MAFIA', 'MAFIAx2']
     .map((turn) => ({
       turn,
@@ -438,17 +386,16 @@
       ),
     }))
     .filter((g) => g.bosses.length > 0)
-  $: filteredSoonList = soonList.filter((b) => matchesSearch(b.name))
-  $: bossesByTurn = groupByTurn(remainingBosses)
-  $: soonByTurn = groupByTurn(filteredSoonList)
+  $: bossesByTurn = groupByTurn(
+    sortedBosses.filter((b) => matchesSearch(b.name))
+  )
   $: searchHitCount =
-    filteredSoonList.length +
-    remainingBosses.length +
+    bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
     weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
   $: searching = searchNeedle.length > 0
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
-  $: if (soonList || bosses.length) {
+  $: if (bosses.length) {
     const watchList = [
       ...sortedBosses.map((b) => {
         const nextSpawn = b.lastDeath.getTime() + b.spawnIntervalHours * 3600 * 1000
@@ -589,48 +536,6 @@
     </div>
   </header>
 
-  {#if soonList.length > 0}
-    <section class="hero sticky-hero">
-      <div class="hero-header">
-        <h2 class="section-title alert">Akan Spawn Sebentar Lagi</h2>
-        <span class="hero-count">{filteredSoonList.length} boss</span>
-      </div>
-      {#if filteredSoonList.length === 0 && searching}
-        <p class="empty-hint">Tidak ada boss hampir spawn yang cocok dengan pencarian.</p>
-      {:else}
-        {#each soonByTurn as [turnLabel, turnBosses] (turnLabel)}
-          <div
-            class="turn-panel"
-            class:mafia={turnLabel === 'MAFIA'}
-            class:mafiax2={turnLabel === 'MAFIAx2'}
-            class:noturn={turnLabel === 'Tanpa Turn'}
-          >
-            <h3 class="turn-label">
-              <span class="turn-dot"></span>
-              {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : turnLabel}
-            </h3>
-            <div class="hero-grid">
-              {#each turnBosses as b (b.id)}
-                <SpawnSoonCard
-                  name={b.name}
-                  meta={b.meta}
-                  msLeft={b.msLeft}
-                  isUp={b.isUp}
-                  canMarkKilled={canEdit && b.type === 'interval'}
-                  killing={killingId === b.sourceId}
-                  onMarkKilled={() => {
-                    const src = bosses.find((x) => x.id === b.sourceId)
-                    if (src) openKillForm(src)
-                  }}
-                />
-              {/each}
-            </div>
-          </div>
-        {/each}
-      {/if}
-    </section>
-  {/if}
-
   {#if killError}
     <div class="kill-error">{killError}</div>
   {/if}
@@ -728,12 +633,12 @@
 
   <section>
     <h2 class="section-title">Field Boss (Interval)</h2>
-    {#if remainingBosses.length === 0}
+    {#if bossesByTurn.length === 0}
       <p class="empty-hint">
         {#if searching}
           Tidak ada field boss yang cocok.
         {:else}
-          Semua field boss yang relevan sedang ditampilkan di atas.
+          Belum ada data field boss tersedia.
         {/if}
       </p>
     {:else}
@@ -1093,47 +998,6 @@
     font-weight: 500;
   }
 
-  .hero {
-    margin-bottom: 28px;
-  }
-  .sticky-hero {
-    position: sticky;
-    top: 0;
-    z-index: 40;
-    margin-left: -10px;
-    margin-right: -10px;
-    padding: 14px 10px 16px;
-    background: linear-gradient(180deg, rgba(15, 15, 23, 0.97) 60%, rgba(15, 15, 23, 0.88));
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(240, 180, 40, 0.2);
-    box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.8);
-  }
-  .hero-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
-  }
-  .hero-header .section-title {
-    margin: 0;
-  }
-  .hero-count {
-    font-size: 12px;
-    color: #f0b428;
-    font-weight: 600;
-  }
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
-  }
-  @media (min-width: 720px) {
-    .hero-grid {
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    }
-  }
-
   .notif-banner {
     display: flex;
     flex-wrap: wrap;
@@ -1237,12 +1101,6 @@
     color: #8a8aa0;
     font-weight: 600;
     margin: 0 0 14px;
-  }
-  .section-title.alert {
-    color: #f0b428;
-    text-transform: none;
-    letter-spacing: normal;
-    font-size: 15px;
   }
 
   .turn-panel {

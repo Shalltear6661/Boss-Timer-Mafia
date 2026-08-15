@@ -32,7 +32,7 @@ self.addEventListener('push', (event) => {
     renotify: true,
     vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
-    silent: false,
+    silent: true,
     data: { url: '/' },
   }
 

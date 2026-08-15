@@ -62,6 +62,11 @@
   class:turn-mafia={turn === 'MAFIA'}
   class:turn-mafiax2={turn === 'MAFIAx2'}
 >
+  {#if isUp}
+    <div class="spawn-badge">⚔ SPAWN!</div>
+  {:else if isSoon}
+    <div class="soon-badge">Akan Spawn</div>
+  {/if}
   <div class="top">
     <h4>{turn}</h4>
     <span class="count">{bosses.length} boss</span>
@@ -76,7 +81,11 @@
   {/if}
   <ul class="boss-list">
     {#each visibleRows as row (row.boss.id)}
-      <li class:active={row.boss.id === next?.boss.id} class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}>
+      <li
+        class:active={row.boss.id === next?.boss.id && !(row.msLeft <= 10 * 60 * 1000)}
+        class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}
+        class:spawn-row={row.msLeft <= 0}
+      >
         <span class="name">{row.boss.name}</span>
         <span class="when">{row.dayLabel} {row.clockLabel}</span>
       </li>
@@ -115,12 +124,50 @@
     background: rgba(147, 51, 234, 0.12);
   }
   .card.soon {
+    border: 1px solid rgba(240, 180, 40, 0.55);
     border-left-color: #f0b428;
-    background: rgba(240, 180, 40, 0.06);
+    border-left-width: 4px;
+    background: linear-gradient(135deg, rgba(240, 180, 40, 0.12), rgba(26, 26, 38, 0.95));
+    box-shadow: 0 0 24px -8px rgba(240, 180, 40, 0.4);
   }
   .card.up {
+    border: 1px solid rgba(224, 72, 60, 0.65);
+    border-left-width: 4px;
     border-left-color: #e0483c;
-    background: rgba(224, 72, 60, 0.08);
+    background: linear-gradient(135deg, rgba(224, 72, 60, 0.18), rgba(26, 26, 38, 0.95));
+    box-shadow: 0 0 28px -6px rgba(224, 72, 60, 0.5);
+    animation: pulse-glow 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px -8px rgba(224, 72, 60, 0.4); }
+    50% { box-shadow: 0 0 34px -4px rgba(224, 72, 60, 0.65); }
+  }
+  .spawn-badge {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(224, 72, 60, 0.25);
+    color: #ff6b6b;
+    border: 1px solid rgba(224, 72, 60, 0.5);
+    animation: badge-pulse 1.2s ease-in-out infinite;
+  }
+  .soon-badge {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(240, 180, 40, 0.2);
+    color: #f0b428;
+    border: 1px solid rgba(240, 180, 40, 0.45);
+  }
+  @keyframes badge-pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
   }
   .top {
     display: flex;
@@ -190,8 +237,15 @@
   }
   .boss-list li.soon-row {
     color: #f0b428;
-    background: rgba(240, 180, 40, 0.1);
+    background: rgba(240, 180, 40, 0.12);
     border: 1px solid rgba(240, 180, 40, 0.35);
+  }
+  .boss-list li.spawn-row {
+    color: #ff6b6b;
+    background: rgba(224, 72, 60, 0.15);
+    border: 1px solid rgba(224, 72, 60, 0.4);
+    font-weight: 600;
+    animation: badge-pulse 1.5s ease-in-out infinite;
   }
   .name {
     font-weight: 500;
