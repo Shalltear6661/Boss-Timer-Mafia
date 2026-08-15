@@ -124,50 +124,42 @@
     background: rgba(147, 51, 234, 0.12);
   }
   .card.soon {
-    border: 1px solid rgba(240, 180, 40, 0.55);
+    border: 1px solid rgba(240, 180, 40, 0.35);
+    border-top: 4px solid #f0b428;
     border-left-color: #f0b428;
-    border-left-width: 4px;
-    background: linear-gradient(135deg, rgba(240, 180, 40, 0.12), rgba(26, 26, 38, 0.95));
-    box-shadow: 0 0 24px -8px rgba(240, 180, 40, 0.4);
+    border-left-width: 3px;
+    background: linear-gradient(180deg, rgba(240, 180, 40, 0.08) 0%, rgba(26, 26, 38, 0.95) 40%);
+    box-shadow: 0 0 20px -8px rgba(240, 180, 40, 0.35);
   }
   .card.up {
-    border: 1px solid rgba(224, 72, 60, 0.65);
-    border-left-width: 4px;
+    border: 1px solid rgba(224, 72, 60, 0.45);
+    border-top: 4px solid #e0483c;
     border-left-color: #e0483c;
-    background: linear-gradient(135deg, rgba(224, 72, 60, 0.18), rgba(26, 26, 38, 0.95));
-    box-shadow: 0 0 28px -6px rgba(224, 72, 60, 0.5);
-    animation: pulse-glow 1.5s ease-in-out infinite;
-  }
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px -8px rgba(224, 72, 60, 0.4); }
-    50% { box-shadow: 0 0 34px -4px rgba(224, 72, 60, 0.65); }
+    border-left-width: 3px;
+    background: linear-gradient(180deg, rgba(224, 72, 60, 0.1) 0%, rgba(26, 26, 38, 0.95) 40%);
+    box-shadow: 0 0 20px -8px rgba(224, 72, 60, 0.4);
   }
   .spawn-badge {
     align-self: flex-start;
     font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.08em;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 999px;
-    background: rgba(224, 72, 60, 0.25);
+    background: rgba(224, 72, 60, 0.2);
     color: #ff6b6b;
-    border: 1px solid rgba(224, 72, 60, 0.5);
-    animation: badge-pulse 1.2s ease-in-out infinite;
+    border: 1px solid rgba(224, 72, 60, 0.4);
   }
   .soon-badge {
     align-self: flex-start;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.06em;
-    padding: 4px 12px;
+    padding: 3px 10px;
     border-radius: 999px;
-    background: rgba(240, 180, 40, 0.2);
+    background: rgba(240, 180, 40, 0.15);
     color: #f0b428;
-    border: 1px solid rgba(240, 180, 40, 0.45);
-  }
-  @keyframes badge-pulse {
-    0%, 100% { opacity: 0.8; }
-    50% { opacity: 1; }
+    border: 1px solid rgba(240, 180, 40, 0.35);
   }
   .top {
     display: flex;
@@ -242,10 +234,9 @@
   }
   .boss-list li.spawn-row {
     color: #ff6b6b;
-    background: rgba(224, 72, 60, 0.15);
-    border: 1px solid rgba(224, 72, 60, 0.4);
+    background: rgba(224, 72, 60, 0.12);
+    border: 1px solid rgba(224, 72, 60, 0.35);
     font-weight: 600;
-    animation: badge-pulse 1.5s ease-in-out infinite;
   }
   .name {
     font-weight: 500;

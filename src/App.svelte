@@ -382,12 +382,12 @@
     .map((turn) => ({
       turn,
       bosses: sortedWeeklyBosses.filter(
-        (b) => (b.turn || '').trim() === turn && matchesSearch(b.name)
+        (b) => (b.turn || '').trim() === turn && (!searchNeedle || String(b.name || '').toLowerCase().includes(searchNeedle))
       ),
     }))
     .filter((g) => g.bosses.length > 0)
   $: bossesByTurn = groupByTurn(
-    sortedBosses.filter((b) => matchesSearch(b.name))
+    sortedBosses.filter((b) => !searchNeedle || String(b.name || '').toLowerCase().includes(searchNeedle))
   )
   $: searchHitCount =
     bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
