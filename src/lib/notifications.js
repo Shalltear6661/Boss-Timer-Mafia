@@ -124,7 +124,6 @@ export function checkAndNotify(items) {
               body: m.body(item.name),
               tag: `boss-${item.id}-${m.id}`,
               renotify: true,
-              silent: true,
             })
           } catch (e) {
             console.warn('Gagal kirim notifikasi:', e)
