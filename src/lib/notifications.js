@@ -1,7 +1,12 @@
 const NOTIFIED_KEY = 'boss-timer-notified-v1'
+const ALERT_SOUND_URL = '/alert.mp3'
 
 /** @type {Map<string, Set<string>>} */
 let notified = new Map()
+
+/** @type {HTMLAudioElement | null} */
+let alertAudio = null
+let audioUnlocked = false
 
 function loadNotified() {
   try {
@@ -24,9 +29,51 @@ function saveNotified() {
 
 loadNotified()
 
-/** No-op — suara custom dinonaktifkan; tetap diexport agar App.svelte tidak error */
+function getAlertAudio() {
+  if (typeof Audio === 'undefined') return null
+  if (!alertAudio) {
+    alertAudio = new Audio(ALERT_SOUND_URL)
+    alertAudio.preload = 'auto'
+    alertAudio.volume = 1
+  }
+  return alertAudio
+}
+
+/** Unlock audio setelah gesture user (klik / tap) — wajib di Chrome */
 export async function unlockAudio() {
-  return false
+  const audio = getAlertAudio()
+  if (!audio) return false
+  try {
+    audio.muted = true
+    await audio.play()
+    audio.pause()
+    audio.currentTime = 0
+    audio.muted = false
+    audioUnlocked = true
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Putar suara alert custom */
+export async function playAlertSound() {
+  const audio = getAlertAudio()
+  if (!audio) return false
+  try {
+    if (!audioUnlocked) {
+      await unlockAudio()
+    }
+    audio.pause()
+    audio.currentTime = 0
+    audio.muted = false
+    audio.volume = 1
+    await audio.play()
+    return true
+  } catch (e) {
+    console.warn('Gagal putar suara notif:', e)
+    return false
+  }
 }
 
 /** Cek status permission tanpa memicu dialog / audio */
@@ -53,6 +100,8 @@ export async function ensureNotificationPermission() {
 export async function enableNotificationsWithPush() {
   const granted = await ensureNotificationPermission()
   if (!granted) return { granted: false, push: false }
+  // Unlock audio saat user klik izinkan notif
+  await unlockAudio()
   try {
     const { subscribeToPush, isPushSupported } = await import('./push.js')
     if (!isPushSupported()) return { granted: true, push: false }
@@ -107,7 +156,7 @@ const MILESTONES = [
 
 /**
  * Cek daftar boss dan kirim notifikasi browser jika melewati milestone.
- * Tanpa suara custom (hanya visual / Web Push).
+ * Suara custom (alert.mp3) diputar jika tab masih terbuka.
  * @param {Array<{id: string, name: string, msLeft: number}>} items
  */
 export function checkAndNotify(items) {
@@ -117,6 +166,7 @@ export function checkAndNotify(items) {
     for (const m of MILESTONES) {
       if (m.match(item.msLeft) && !alreadyFired(item.id, m.id)) {
         markFired(item.id, m.id)
+        playAlertSound()
 
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
@@ -124,6 +174,7 @@ export function checkAndNotify(items) {
               body: m.body(item.name),
               tag: `boss-${item.id}-${m.id}`,
               renotify: true,
+              silent: true, // suara custom sudah diputar; hindari double sound OS
             })
           } catch (e) {
             console.warn('Gagal kirim notifikasi:', e)

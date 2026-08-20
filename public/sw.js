@@ -32,10 +32,21 @@ self.addEventListener('push', (event) => {
     renotify: true,
     vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
-    data: { url: '/' },
+    // Suara custom diputar dari tab terbuka via postMessage; OS sound sebagai fallback
+    data: { url: '/', playSound: true },
   }
 
-  event.waitUntil(self.registration.showNotification(data.title || 'Mafia Timer', options))
+  event.waitUntil(
+    Promise.all([
+      self.registration.showNotification(data.title || 'Mafia Timer', options),
+      // Jika ada tab terbuka, minta mainkan suara custom
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+        for (const client of windowClients) {
+          client.postMessage({ type: 'PLAY_ALERT_SOUND' })
+        }
+      }),
+    ])
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {

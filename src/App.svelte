@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
-  import { ensureNotificationPermission, checkAndNotify, unlockAudio, isNotificationGranted, enableNotificationsWithPush } from './lib/notifications.js'
+  import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush } from './lib/notifications.js'
   import {
     getAuthConfig,
     fetchMe,
@@ -441,6 +441,16 @@
       window.removeEventListener('pointerdown', unlockOnce)
     }
     window.addEventListener('pointerdown', unlockOnce)
+
+    // Web Push → minta tab terbuka putar suara custom
+    const onSwMessage = (event) => {
+      if (event.data?.type === 'PLAY_ALERT_SOUND') playAlertSound()
+    }
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', onSwMessage)
+      window._swMessageHandler = onSwMessage
+    }
+
     tickInterval = setInterval(() => {
       now = new Date()
     }, 1000)
@@ -455,6 +465,10 @@
     if (mobileMq?._onChange) {
       if (mobileMq.removeEventListener) mobileMq.removeEventListener('change', mobileMq._onChange)
       else mobileMq.removeListener(mobileMq._onChange)
+    }
+    if (window._swMessageHandler && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.removeEventListener('message', window._swMessageHandler)
+      delete window._swMessageHandler
     }
   })
 </script>
