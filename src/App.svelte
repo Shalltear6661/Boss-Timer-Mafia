@@ -30,6 +30,8 @@
   const MINIMIZED_BOSS_COUNT_MOBILE = 3
   const MINIMIZED_BOSS_COUNT_DESKTOP = 4
   const MOBILE_MQ = '(max-width: 719px)'
+  const SPREADSHEET_URL =
+    'https://docs.google.com/spreadsheets/d/1WL21q_xEAqmt6TQ15zvobC-Ui5vEUxvjMIKDf_1o3Q8/edit?gid=165179480#gid=165179480'
   // Service Account + share sheet sudah siap
   const ENABLE_MARK_KILLED = true
 
@@ -157,25 +159,17 @@
     }
   }
 
-  function isTurnMinimized(key) {
-    return turnMinimized[key] !== false
-  }
-
   function toggleTurnMinimized(key) {
+    const currentlyMinimized = turnMinimized[key] !== false
     turnMinimized = {
       ...turnMinimized,
-      [key]: !isTurnMinimized(key),
+      [key]: !currentlyMinimized,
     }
     try {
       localStorage.setItem(TURN_MIN_KEY, JSON.stringify(turnMinimized))
     } catch {
       /* ignore */
     }
-  }
-
-  function visibleTurnBosses(list, key) {
-    if (!isTurnMinimized(key) || list.length <= minimizedBossCount) return list
-    return list.slice(0, minimizedBossCount)
   }
 
   $: canEdit = ENABLE_MARK_KILLED && !!user.canEdit
@@ -480,14 +474,15 @@
       <div>
         <h1>Mafia Timer</h1>
         <div class="brand-status">
-          <button
+          <a
             class="spreadsheet-status"
             class:live={spreadsheetStatus === 'live'}
             class:cache={spreadsheetStatus === 'cache'}
             class:loading={spreadsheetStatus === 'loading'}
-            on:click={refreshFromSpreadsheet}
-            title="Klik untuk refresh dari spreadsheet"
-            disabled={syncing}
+            href={SPREADSHEET_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Buka spreadsheet di tab baru"
           >
             {#if spreadsheetStatus === 'loading'}
               <span class="dot loading-dot"></span>
@@ -499,7 +494,7 @@
               <span class="dot cache-dot"></span>
               <span class="label">Lokal</span>
             {/if}
-          </button>
+          </a>
         </div>
         <h2 class="tagline">Bersama MOJO kita kuasai LORDNINE</h2>
       </div>
@@ -658,8 +653,11 @@
     {:else}
       {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
         {@const turnKey = 'field:' + turnLabel}
-        {@const minimized = isTurnMinimized(turnKey)}
-        {@const shownBosses = visibleTurnBosses(turnBosses, turnKey)}
+        {@const minimized = turnMinimized[turnKey] !== false}
+        {@const shownBosses =
+          !minimized || turnBosses.length <= minimizedBossCount
+            ? turnBosses
+            : turnBosses.slice(0, minimizedBossCount)}
         <div
           class="turn-panel"
           class:mafia={turnLabel === 'MAFIA'}
@@ -716,15 +714,17 @@
     {:else}
       <div class="card-grid weekly-turn-grid">
         {#each weeklyTurnCards as group (group.turn)}
+          {@const weeklyKey = 'weekly:' + group.turn}
+          {@const weeklyMinimized = turnMinimized[weeklyKey] !== false}
           <WeeklyCard
             turn={group.turn}
             bosses={group.bosses}
             {now}
             timeZone={displayTimeZone}
             {tzLabel}
-            minimized={isTurnMinimized('weekly:' + group.turn)}
+            minimized={weeklyMinimized}
             minCount={minimizedBossCount}
-            onToggleMinimize={() => toggleTurnMinimized('weekly:' + group.turn)}
+            onToggleMinimize={() => toggleTurnMinimized(weeklyKey)}
           />
         {/each}
       </div>
@@ -811,13 +811,10 @@
     border: 1px solid #2a2a38;
     cursor: pointer;
     font-family: inherit;
+    text-decoration: none;
   }
-  .brand-status .spreadsheet-status:hover:not(:disabled) {
+  .brand-status .spreadsheet-status:hover {
     border-color: #4a4a68;
-  }
-  .brand-status .spreadsheet-status:disabled {
-    opacity: 0.7;
-    cursor: wait;
   }
   .brand-status .spreadsheet-status.live {
     border-color: #2a6a3a;
