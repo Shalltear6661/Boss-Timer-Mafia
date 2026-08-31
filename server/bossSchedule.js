@@ -1,4 +1,4 @@
-import { fetchSheetValues, getMaintenanceMode, getAllSheetConfigs } from './sheets.js'
+import { fetchSheetValues, getAllSheetConfigs } from './sheets.js'
 
 const DAY_MAP = {
   sunday: 0,
@@ -183,12 +183,6 @@ async function loadWeeklyBosses(config, now, env) {
 }
 
 export async function loadWatchList(env = process.env, now = new Date()) {
-  // Cek maintenance — jika aktif, skip semua notifikasi
-  const maint = await getMaintenanceMode(env)
-  if (maint.maintenance) {
-    return []
-  }
-
   const configs = getAllSheetConfigs(env)
 
   const results = await Promise.allSettled(

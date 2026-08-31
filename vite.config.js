@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { fetchSheetValues, getMaintenanceMode } from './server/sheets.js'
-import { markBossKilledOnSheet, setMaintenanceMode } from './server/sheetsWrite.js'
+import { fetchSheetValues } from './server/sheets.js'
+import { markBossKilledOnSheet } from './server/sheetsWrite.js'
 import {
   verifyGoogleIdToken,
   signSession,
@@ -157,39 +157,6 @@ function sheetsApiPlugin(env) {
       } catch (e) {
         console.error('[kill-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Gagal update spreadsheet' })
-      }
-      return
-    }
-
-    // --- Maintenance ---
-    if (url.startsWith('/api/maintenance') && req.method === 'GET') {
-      try {
-        const result = await getMaintenanceMode(env)
-        sendJson(res, 200, result)
-      } catch (e) {
-        sendJson(res, 500, { error: e.message || 'Gagal baca maintenance', maintenance: false })
-      }
-      return
-    }
-
-    if (url.startsWith('/api/maintenance') && req.method === 'POST') {
-      try {
-        const fakeReq = { headers: { cookie: req.headers.cookie || '' } }
-        const session = getSessionFromRequest(fakeReq, env)
-        if (!session?.email) {
-          sendJson(res, 401, { error: 'Login dulu' })
-          return
-        }
-        if (!isEditorEmail(session.email, env)) {
-          sendJson(res, 403, { error: 'Hanya Editor yang bisa toggle maintenance' })
-          return
-        }
-        const body = await readJsonBody(req)
-        const active = body.active === true
-        const result = await setMaintenanceMode(active, env)
-        sendJson(res, 200, { ...result, toggledBy: session.email })
-      } catch (e) {
-        sendJson(res, 500, { error: e.message || 'Gagal set maintenance' })
       }
       return
     }

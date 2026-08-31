@@ -1,5 +1,5 @@
 import { getAccessToken } from './googleAuth.js'
-import { getSheetsConfig, getAllSheetConfigs } from './sheets.js'
+import { getSheetsConfig } from './sheets.js'
 
 /** Format waktu kematian sesuai spreadsheet: DD/MM/YYYY H:mm (WIB) */
 export function formatDeathForSheet(date = new Date()) {
@@ -93,40 +93,4 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
     sheetName,
     spreadsheetId,
   }
-}
-
-/** Cell maintenance flag */
-const MAINTENANCE_CELL = 'Z1'
-const MAINTENANCE_ACTIVE = 'MAINTENANCE'
-
-/** Atur status maintenance di SEMUA sheet (MAFIA dan MAFIAx2) */
-export async function setMaintenanceMode(active, env = process.env) {
-  const configs = getAllSheetConfigs(env)
-  const accessToken = await getAccessToken(env)
-  const results = []
-
-  for (const { spreadsheetId, sheetName } of configs) {
-    const safeSheet = String(sheetName).replace(/'/g, "''")
-    const writeRange = `'${safeSheet}'!${MAINTENANCE_CELL}`
-    const writeUrl =
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-      `/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`
-
-    const writeRes = await fetch(writeUrl, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ values: [[active ? MAINTENANCE_ACTIVE : '']] }),
-    })
-
-    if (!writeRes.ok) {
-      const writeData = await writeRes.json().catch(() => ({}))
-      throw new Error(writeData.error?.message || `Gagal set maintenance di ${sheetName} (${writeRes.status})`)
-    }
-    results.push({ sheetName, ok: true })
-  }
-
-  return { ok: true, active, sheets: results }
 }

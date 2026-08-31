@@ -117,22 +117,3 @@ export async function fetchSheetValues(range, turn = '', env = process.env) {
   const data = await res.json()
   return data.values || []
 }
-
-/** Cell maintenance flag */
-const MAINTENANCE_CELL = 'Z1'
-const MAINTENANCE_ACTIVE = 'MAINTENANCE'
-
-/** Cek maintenance di semua sheet */
-export async function getMaintenanceMode(env = process.env) {
-  const configs = getAllSheetConfigs(env)
-
-  const results = await Promise.allSettled(
-    configs.map(async ({ turn }) => {
-      const rows = await fetchSheetValues(MAINTENANCE_CELL, turn, env)
-      return (rows?.[0]?.[0] || '').trim() === MAINTENANCE_ACTIVE
-    })
-  )
-
-  const anyMaintenance = results.some((r) => r.status === 'fulfilled' && r.value === true)
-  return { maintenance: anyMaintenance }
-}

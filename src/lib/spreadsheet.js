@@ -171,28 +171,3 @@ export async function fetchWeeklyBosses() {
   }
   return Object.values(bossMap)
 }
-
-/** Baca status maintenance dari server */
-export async function fetchMaintenanceStatus() {
-  const res = await fetch('/api/maintenance')
-  if (!res.ok) {
-    return { maintenance: false }
-  }
-  const data = await res.json()
-  return { maintenance: data.maintenance === true }
-}
-
-/** Toggle maintenance mode (editor only) */
-export async function toggleMaintenanceActive(active) {
-  const res = await fetch('/api/maintenance', {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ active }),
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(data.error || `Gagal toggle maintenance: ${res.status}`)
-  }
-  return data
-}
