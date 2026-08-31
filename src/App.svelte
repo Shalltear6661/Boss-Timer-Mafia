@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
-  import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
+  import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled, fetchMaintenanceStatus, toggleMaintenanceActive } from './lib/spreadsheet.js'
   import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush } from './lib/notifications.js'
   import {
     getAuthConfig,
@@ -31,7 +31,7 @@
   const MINIMIZED_BOSS_COUNT_DESKTOP = 4
   const MOBILE_MQ = '(max-width: 719px)'
   const SPREADSHEET_URL =
-    'https://docs.google.com/spreadsheets/d/1WL21q_xEAqmt6TQ15zvobC-Ui5vEUxvjMIKDf_1o3Q8/edit?gid=165179480#gid=165179480'
+    'https://docs.google.com/spreadsheets/d/16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI/edit?gid=1345093675#gid=1345093675'
   // Service Account + share sheet sudah siap
   const ENABLE_MARK_KILLED = true
 
@@ -89,7 +89,8 @@
     if (!boss?.name) return
     try {
       const deathISO = deathDate.toISOString()
-      await markBossKilled(boss.name, deathISO)
+      const turn = boss._sheetTurn || ''
+      await markBossKilled(boss.name, deathISO, turn)
       bosses = bosses.map((b) =>
         b.id === boss.id ? { ...b, lastDeath: deathDate } : b
       )
@@ -125,6 +126,8 @@
       ? window.matchMedia(MOBILE_MQ).matches
       : true
   let mobileMq
+  let maintenanceMode = false
+  let maintenanceLoading = false
 
   $: tzOption = getTimezoneOption(tzId)
   $: displayTimeZone = tzOption.tz
@@ -214,12 +217,18 @@
     if (syncing) return
     syncing = true
     try {
-      const [fetchedBosses, fetchedWeekly] = await Promise.all([
+      const [fetchedBosses, fetchedWeekly, maint] = await Promise.all([
         fetchIntervalBosses(),
         fetchWeeklyBosses(),
+        fetchMaintenanceStatus(),
       ])
 
-      if (fetchedBosses.length > 0) {
+      maintenanceMode = maint.maintenance
+
+      if (maintenanceMode) {
+        bosses = []
+        persist()
+      } else if (fetchedBosses.length > 0) {
         bosses = fetchedBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath) }))
         persist()
       }
@@ -257,6 +266,25 @@
     await syncFromSpreadsheet()
   }
 
+  async function toggleMaintenance(active) {
+    if (!canEdit || maintenanceLoading) return
+    maintenanceLoading = true
+    try {
+      await toggleMaintenanceActive(active)
+      maintenanceMode = active
+      if (active) {
+        bosses = []
+        persist()
+      } else {
+        await syncFromSpreadsheet()
+      }
+    } catch (e) {
+      console.error('Gagal toggle maintenance:', e)
+    } finally {
+      maintenanceLoading = false
+    }
+  }
+
   async function markKilled(boss, deathDate) {
     if (!canEdit) {
       killError = 'Login sebagai Editor untuk menandai mati'
@@ -267,7 +295,8 @@
     killError = ''
     try {
       const deathISO = deathDate ? deathDate.toISOString() : new Date().toISOString()
-      await markBossKilled(boss.name, deathISO)
+      const turn = boss._sheetTurn || ''
+      await markBossKilled(boss.name, deathISO, turn)
       bosses = bosses.map((b) =>
         b.id === boss.id ? { ...b, lastDeath: deathDate || new Date() } : b
       )
@@ -547,6 +576,35 @@
 
   {#if killError}
     <div class="kill-error">{killError}</div>
+  {/if}
+
+  <!-- Maintenance Banner -->
+  {#if maintenanceMode}
+    <div class="maintenance-banner" role="alert">
+      <div class="maint-icon">🔧</div>
+      <div class="maint-text">
+        <strong>Maintenance Aktif</strong> — Jadwal interval boss dikosongkan sementara.
+        {#if canEdit}
+          <button
+            class="maint-btn"
+            on:click={() => toggleMaintenance(false)}
+            disabled={maintenanceLoading}
+          >
+            {maintenanceLoading ? 'Memproses...' : 'Akhiri Maintenance'}
+          </button>
+        {/if}
+      </div>
+    </div>
+  {:else if canEdit}
+    <div class="maintenance-toggle">
+      <button
+        class="maint-btn outline"
+        on:click={() => toggleMaintenance(true)}
+        disabled={maintenanceLoading}
+      >
+        {maintenanceLoading ? 'Memproses...' : 'Mulai Maintenance'}
+      </button>
+    </div>
   {/if}
 
   {#if killTarget}
@@ -1343,6 +1401,64 @@
   .modal-confirm:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* Maintenance */
+  .maintenance-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(224, 72, 60, 0.15);
+    border: 1px solid rgba(224, 72, 60, 0.55);
+    color: #ff8a7a;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .maint-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+    line-height: 1.2;
+  }
+  .maint-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .maint-text strong {
+    color: #ffa090;
+  }
+  .maint-btn {
+    display: inline-block;
+    margin-top: 8px;
+    background: #e0483c;
+    border: none;
+    color: #fff;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .maint-btn:hover:not(:disabled) {
+    background: #d04030;
+  }
+  .maint-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .maint-btn.outline {
+    background: transparent;
+    border: 1px solid #e0483c;
+    color: #ff8a7a;
+  }
+  .maint-btn.outline:hover:not(:disabled) {
+    background: rgba(224, 72, 60, 0.15);
+  }
+  .maintenance-toggle {
+    margin-bottom: 20px;
   }
 
   @media (max-width: 719px) {

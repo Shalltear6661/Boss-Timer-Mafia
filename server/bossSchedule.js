@@ -1,4 +1,4 @@
-import { fetchSheetValues } from './sheets.js'
+import { fetchSheetValues, getMaintenanceMode, getAllSheetConfigs } from './sheets.js'
 
 const DAY_MAP = {
   sunday: 0,
@@ -116,15 +116,23 @@ function nextOccurrence(schedule, now) {
   return candidate
 }
 
-export async function loadWatchList(env = process.env, now = new Date()) {
-  const [intervalRows, weeklyRows] = await Promise.all([
-    fetchSheetValues('A2:H', env),
-    fetchSheetValues('A30:D', env),
-  ])
+/** Fetch interval bosses dari satu sheet tertentu (berdasarkan config turn) */
+async function loadIntervalBosses(config, now) {
+  const { sheetName, spreadsheetId, apiKey, turn } = config
+  const safeSheet = String(sheetName).replace(/'/g, "''")
+  const a1 = `'${safeSheet}'!A2:H`
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
+    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
 
+  const res = await fetch(url)
+  if (!res.ok) return []
+
+  const data = await res.json()
+  const rows = data.values || []
   const items = []
 
-  for (const row of intervalRows) {
+  for (const row of rows) {
     const name = (row[0] || '').trim()
     if (!name || name === 'Boss Name') continue
     const interval = Number(row[2]) || 0
@@ -137,8 +145,26 @@ export async function loadWatchList(env = process.env, now = new Date()) {
     items.push({ id, name, msLeft: nextSpawn - now.getTime() })
   }
 
+  return items
+}
+
+/** Fetch weekly bosses dari satu sheet tertentu (berdasarkan config turn) */
+async function loadWeeklyBosses(config, now) {
+  const { sheetName, spreadsheetId, apiKey } = config
+  const safeSheet = String(sheetName).replace(/'/g, "''")
+  const a1 = `'${safeSheet}'!A30:D`
+  const url =
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
+    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
+
+  const res = await fetch(url)
+  if (!res.ok) return []
+
+  const data = await res.json()
+  const rows = data.values || []
   const bossMap = {}
-  for (const row of weeklyRows) {
+
+  for (const row of rows) {
     const name = (row[0] || '').trim()
     if (!name || name === 'Boss Name') continue
     const dayName = (row[2] || '').trim()
@@ -149,6 +175,8 @@ export async function loadWatchList(env = process.env, now = new Date()) {
     if (!bossMap[id]) bossMap[id] = { id, name, schedules: [] }
     bossMap[id].schedules.push({ day, time })
   }
+
+  const items = []
   for (const b of Object.values(bossMap)) {
     let soonest = null
     for (const s of b.schedules) {
@@ -158,6 +186,34 @@ export async function loadWatchList(env = process.env, now = new Date()) {
     if (soonest) {
       items.push({ id: b.id, name: b.name, msLeft: soonest.getTime() - now.getTime() })
     }
+  }
+
+  return items
+}
+
+export async function loadWatchList(env = process.env, now = new Date()) {
+  // Cek maintenance — jika aktif, skip semua notifikasi
+  const maint = await getMaintenanceMode(env)
+  if (maint.maintenance) {
+    return []
+  }
+
+  const configs = getAllSheetConfigs(env)
+    .filter((c) => c.apiKey && c.spreadsheetId && c.sheetName)
+
+  const results = await Promise.allSettled(
+    configs.map(async (config) => {
+      const [intervalItems, weeklyItems] = await Promise.all([
+        loadIntervalBosses(config, now),
+        loadWeeklyBosses(config, now),
+      ])
+      return [...intervalItems, ...weeklyItems]
+    })
+  )
+
+  const items = []
+  for (const r of results) {
+    if (r.status === 'fulfilled') items.push(...r.value)
   }
 
   return items

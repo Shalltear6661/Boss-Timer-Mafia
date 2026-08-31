@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { fetchSheetValues } from './server/sheets.js'
-import { markBossKilledOnSheet } from './server/sheetsWrite.js'
+import { fetchSheetValues, getMaintenanceMode } from './server/sheets.js'
+import { markBossKilledOnSheet, setMaintenanceMode } from './server/sheetsWrite.js'
 import {
   verifyGoogleIdToken,
   signSession,
@@ -117,12 +117,13 @@ function sheetsApiPlugin(env) {
       try {
         const parsed = new URL(url, 'http://localhost')
         const range = parsed.searchParams.get('range')
+        const turn = parsed.searchParams.get('turn') || ''
         if (!range) {
           sendJson(res, 400, { error: 'Query range wajib' })
           return
         }
-        const values = await fetchSheetValues(range, env)
-        sendJson(res, 200, { values })
+        const values = await fetchSheetValues(range, turn, env)
+        sendJson(res, 200, { values, turn: turn || 'default' })
       } catch (e) {
         console.error('[sheets-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Gagal fetch spreadsheet' })
@@ -150,11 +151,45 @@ function sheetsApiPlugin(env) {
         }
         const deathISO = body.deathTime || body.deathDate || null
         const deathDate = deathISO ? new Date(deathISO) : new Date()
-        const result = await markBossKilledOnSheet(String(name), env, deathDate)
+        const turn = body.turn || ''
+        const result = await markBossKilledOnSheet(String(name), env, deathDate, String(turn))
         sendJson(res, 200, { ok: true, ...result, by: session.email })
       } catch (e) {
         console.error('[kill-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Gagal update spreadsheet' })
+      }
+      return
+    }
+
+    // --- Maintenance ---
+    if (url.startsWith('/api/maintenance') && req.method === 'GET') {
+      try {
+        const result = await getMaintenanceMode(env)
+        sendJson(res, 200, result)
+      } catch (e) {
+        sendJson(res, 500, { error: e.message || 'Gagal baca maintenance', maintenance: false })
+      }
+      return
+    }
+
+    if (url.startsWith('/api/maintenance') && req.method === 'POST') {
+      try {
+        const fakeReq = { headers: { cookie: req.headers.cookie || '' } }
+        const session = getSessionFromRequest(fakeReq, env)
+        if (!session?.email) {
+          sendJson(res, 401, { error: 'Login dulu' })
+          return
+        }
+        if (!isEditorEmail(session.email, env)) {
+          sendJson(res, 403, { error: 'Hanya Editor yang bisa toggle maintenance' })
+          return
+        }
+        const body = await readJsonBody(req)
+        const active = body.active === true
+        const result = await setMaintenanceMode(active, env)
+        sendJson(res, 200, { ...result, toggledBy: session.email })
+      } catch (e) {
+        sendJson(res, 500, { error: e.message || 'Gagal set maintenance' })
       }
       return
     }

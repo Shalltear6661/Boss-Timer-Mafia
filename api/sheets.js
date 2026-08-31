@@ -1,47 +1,12 @@
 /**
  * Vercel Serverless Function
- * GET /api/sheets?range=A2:D
+ * GET /api/sheets?range=A2:H&turn=MAFIA
  *
- * Baca env lewat bracket notation supaya bundler tidak meng-inline
- * process.env.GOOGLE_SHEETS_API_KEY menjadi undefined saat build.
+ * Multi-sheet: parameter ?turn=MAFIA / MAFIAx2 untuk routing ke sheet berbeda.
+ * Jika turn tidak diisi, fallback ke config umum.
  */
 
-function getConfig() {
-  const env = process.env
-  return {
-    // Bracket notation = hindari inlining kosong saat build Vercel
-    apiKey: env['GOOGLE_SHEETS_API_KEY'] || env['GOOGLE_API_KEY'] || '',
-    spreadsheetId: env['GOOGLE_SHEETS_ID'] || '1WL21q_xEAqmt6TQ15zvobC-Ui5vEUxvjMIKDf_1o3Q8',
-    sheetName: env['GOOGLE_SHEETS_NAME'] || 'BOSS Timer',
-  }
-}
-
-async function fetchSheetValues(range) {
-  const { apiKey, spreadsheetId, sheetName } = getConfig()
-
-  if (!apiKey) {
-    const err = new Error('GOOGLE_SHEETS_API_KEY belum di-set di environment')
-    err.code = 'MISSING_ENV'
-    throw err
-  }
-  if (!range || !/^[A-Z0-9:]+$/i.test(range)) {
-    throw new Error('Range tidak valid')
-  }
-
-  const safeSheet = String(sheetName).replace(/'/g, "''")
-  const a1 = `'${safeSheet}'!${range}`
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
-
-  const res = await fetch(url)
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Google Sheets error ${res.status}: ${text.slice(0, 200)}`)
-  }
-  const data = await res.json()
-  return data.values || []
-}
+import { fetchSheetValues } from '../server/sheets.js'
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=60')
@@ -54,10 +19,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Vercel menyediakan req.query; fallback ke URL parsing
     const range =
       (req.query && req.query.range) ||
       new URL(req.url || '/', 'http://localhost').searchParams.get('range')
+
+    const turn =
+      (req.query && req.query.turn) ||
+      new URL(req.url || '/', 'http://localhost').searchParams.get('turn') ||
+      ''
 
     if (!range) {
       res.statusCode = 400
@@ -65,9 +34,9 @@ export default async function handler(req, res) {
       return
     }
 
-    const values = await fetchSheetValues(String(range))
+    const values = await fetchSheetValues(String(range), String(turn), process.env)
     res.statusCode = 200
-    res.end(JSON.stringify({ values }))
+    res.end(JSON.stringify({ values, turn: turn || 'default' }))
   } catch (e) {
     console.error('[api/sheets]', e?.message || e)
     res.statusCode = e?.code === 'MISSING_ENV' ? 500 : 500

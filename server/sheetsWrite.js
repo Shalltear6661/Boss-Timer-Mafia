@@ -1,5 +1,5 @@
 import { getAccessToken } from './googleAuth.js'
-import { getSheetsConfig } from './sheets.js'
+import { getSheetsConfig, getAllSheetConfigs } from './sheets.js'
 
 /** Format waktu kematian sesuai spreadsheet: DD/MM/YYYY H:mm (WIB) */
 export function formatDeathForSheet(date = new Date()) {
@@ -13,25 +13,24 @@ export function formatDeathForSheet(date = new Date()) {
     hour12: false,
   })
   const parts = Object.fromEntries(fmt.formatToParts(date).map((p) => [p.type, p.value]))
-  // en-GB: day/month/year — hour bisa "24" di beberapa engine untuk midnight; normalisasi
   let hour = Number(parts.hour)
   if (hour === 24) hour = 0
   return `${parts.day}/${parts.month}/${parts.year} ${hour}:${parts.minute}`
 }
 
 /**
- * Update kolom Time of Death (D) untuk boss interval berdasarkan nama.
+ * Update kolom Time of Death (D) untuk boss interval.
+ * Parameter turn menentukan sheet tujuan (MAFIA / MAFIAx2).
  * @returns {{ row: number, deathTime: string, name: string }}
  */
-export async function markBossKilledOnSheet(bossName, env = process.env, deathDate = new Date()) {
+export async function markBossKilledOnSheet(bossName, env = process.env, deathDate = new Date(), turn = '') {
   const name = (bossName || '').trim()
   if (!name) throw new Error('Nama boss wajib')
 
-  const { spreadsheetId, sheetName } = getSheetsConfig(env)
+  const { spreadsheetId, sheetName } = getSheetsConfig(turn, env)
   const accessToken = await getAccessToken(env)
   const deathTime = formatDeathForSheet(deathDate)
 
-  // Baca kolom nama untuk cari baris
   const safeSheet = String(sheetName).replace(/'/g, "''")
   const readRange = `'${safeSheet}'!A2:A`
   const readUrl =
@@ -59,7 +58,6 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
     throw new Error(`Boss "${name}" tidak ditemukan di spreadsheet`)
   }
 
-  // Baris spreadsheet = index + 2 (header di baris 1)
   const sheetRow = rowIndex + 2
   const writeRange = `'${safeSheet}'!D${sheetRow}`
   const writeUrl =
@@ -80,4 +78,40 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
   }
 
   return { row: sheetRow, deathTime, name: rows[rowIndex][0].trim() }
+}
+
+/** Cell maintenance flag */
+const MAINTENANCE_CELL = 'Z1'
+const MAINTENANCE_ACTIVE = 'MAINTENANCE'
+
+/** Atur status maintenance di SEMUA sheet (MAFIA dan MAFIAx2) */
+export async function setMaintenanceMode(active, env = process.env) {
+  const configs = getAllSheetConfigs(env)
+  const accessToken = await getAccessToken(env)
+  const results = []
+
+  for (const { spreadsheetId, sheetName } of configs) {
+    const safeSheet = String(sheetName).replace(/'/g, "''")
+    const writeRange = `'${safeSheet}'!${MAINTENANCE_CELL}`
+    const writeUrl =
+      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
+      `/values/${encodeURIComponent(writeRange)}?valueInputOption=USER_ENTERED`
+
+    const writeRes = await fetch(writeUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ values: [[active ? MAINTENANCE_ACTIVE : '']] }),
+    })
+
+    if (!writeRes.ok) {
+      const writeData = await writeRes.json().catch(() => ({}))
+      throw new Error(writeData.error?.message || `Gagal set maintenance di ${sheetName} (${writeRes.status})`)
+    }
+    results.push({ sheetName, ok: true })
+  }
+
+  return { ok: true, active, sheets: results }
 }
