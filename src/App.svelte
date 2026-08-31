@@ -27,8 +27,8 @@
   const TURN_MIN_KEY = 'boss-timer-turn-min-v1'
   const TZ_STORAGE_KEY = 'boss-timer-tz-v1'
   const SYNC_INTERVAL_MS = 60 * 1000
-  const MINIMIZED_BOSS_COUNT_MOBILE = 3
-  const MINIMIZED_BOSS_COUNT_DESKTOP = 4
+  const MINIMIZED_BOSS_COUNT_MOBILE = 2
+  const MINIMIZED_BOSS_COUNT_DESKTOP = 2
   const MOBILE_MQ = '(max-width: 719px)'
   const SPREADSHEET_URL =
     'https://docs.google.com/spreadsheets/d/16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI/edit?gid=1345093675#gid=1345093675'
