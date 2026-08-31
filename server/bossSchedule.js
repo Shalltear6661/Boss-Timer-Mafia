@@ -130,19 +130,8 @@ function nextOccurrence(schedule, now) {
 }
 
 /** Fetch interval bosses dari satu sheet tertentu (berdasarkan config turn) */
-async function loadIntervalBosses(config, now) {
-  const { sheetName, spreadsheetId, apiKey, turn } = config
-  const safeSheet = String(sheetName).replace(/'/g, "''")
-  const a1 = `'${safeSheet}'!A2:H`
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
-
-  const res = await fetch(url)
-  if (!res.ok) return []
-
-  const data = await res.json()
-  const rows = data.values || []
+async function loadIntervalBosses(config, now, env) {
+  const rows = await fetchSheetValues('A2:H', config.turn, env)
   const items = []
 
   for (const row of rows) {
@@ -150,7 +139,7 @@ async function loadIntervalBosses(config, now) {
     if (!name || name === 'Boss Name') continue
     const interval = Number(row[2]) || 0
     const deathStr = (row[3] || '').trim()
-    if (deathStr && deathStr.startsWith('01/01/2012')) continue
+    if (deathStr && /^(0?1)[\/\-](0?1)[\/\-]2012/.test(deathStr)) continue
     const lastDeath = parseDeathDate(deathStr)
     if (!lastDeath || !interval) continue
     const id = 'ib-' + name.toLowerCase().replace(/\s+/g, '-')
@@ -161,20 +150,9 @@ async function loadIntervalBosses(config, now) {
   return items
 }
 
-/** Fetch weekly bosses dari satu sheet tertentu (berdasarkan config turn) */
-async function loadWeeklyBosses(config, now) {
-  const { sheetName, spreadsheetId, apiKey } = config
-  const safeSheet = String(sheetName).replace(/'/g, "''")
-  const a1 = `'${safeSheet}'!A25:D`
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
-
-  const res = await fetch(url)
-  if (!res.ok) return []
-
-  const data = await res.json()
-  const rows = data.values || []
+/** Fetch weekly bosses — MAFIA mulai ~baris 25, MAFIAx2 mulai ~baris 17 */
+async function loadWeeklyBosses(config, now, env) {
+  const rows = await fetchSheetValues('A17:D', config.turn, env)
   const bossMap = {}
 
   for (const row of rows) {
@@ -212,13 +190,12 @@ export async function loadWatchList(env = process.env, now = new Date()) {
   }
 
   const configs = getAllSheetConfigs(env)
-    .filter((c) => c.apiKey && c.spreadsheetId && c.sheetName)
 
   const results = await Promise.allSettled(
     configs.map(async (config) => {
       const [intervalItems, weeklyItems] = await Promise.all([
-        loadIntervalBosses(config, now),
-        loadWeeklyBosses(config, now),
+        loadIntervalBosses(config, now, env),
+        loadWeeklyBosses(config, now, env),
       ])
       return [...intervalItems, ...weeklyItems]
     })

@@ -1,11 +1,14 @@
 /**
  * Shared Google Sheets fetch — dipakai Vite (dev) & Vercel (production).
- * API key hanya hidup di server / env, tidak pernah dikirim ke browser.
  *
  * Multi-sheet berdasarkan turn:
  * - MAFIA → sheet Boss Timer M1
  * - MAFIAx2 → sheet Boss Timer M2
+ *
+ * Baca sheet prioritas: Service Account (bisa akses private) → fallback API Key.
  */
+
+import { getAccessToken } from './googleAuth.js'
 
 /** Default hardcode — dipakai jika env turn-specific belum di-set di Vercel */
 const DEFAULT_SHEETS = {
@@ -45,7 +48,6 @@ export function getSheetsConfig(turn = '', env = process.env) {
     }
   }
 
-  // Fallback ke config umum / MAFIA
   const spreadsheetId =
     env['GOOGLE_SHEETS_ID'] || DEFAULT_SHEETS.MAFIA.spreadsheetId
   const sheetName = env['GOOGLE_SHEETS_NAME'] || DEFAULT_SHEETS.MAFIA.sheetName
@@ -61,57 +63,71 @@ export function getAllSheetConfigs(env = process.env) {
 }
 
 /**
- * Fetch values dari sheet tertentu (berdasarkan turn).
- * @param {string} range contoh: "A2:H"
- * @param {string} [turn] - "MAFIA" | "MAFIAx2" | "" (fallback)
- * @param {NodeJS.ProcessEnv} [env]
- * @returns {Promise<string[][]>}
+ * Fetch values dari sheet tertentu.
+ * Prioritas auth: Service Account → API Key (untuk sheet private).
  */
 export async function fetchSheetValues(range, turn = '', env = process.env) {
   const { apiKey, spreadsheetId, sheetName } = getSheetsConfig(turn, env)
-  if (!apiKey) {
-    throw new Error('GOOGLE_SHEETS_API_KEY belum di-set di environment')
-  }
   if (!range || !/^[A-Z0-9:]+$/i.test(range)) {
     throw new Error('Range tidak valid')
   }
 
   const safeSheet = String(sheetName).replace(/'/g, "''")
   const a1 = `'${safeSheet}'!${range}`
-  const url =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
+  const encoded = encodeURIComponent(a1)
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encoded}`
 
-  const res = await fetch(url)
+  // 1) Coba Service Account dulu (bisa baca sheet private)
+  try {
+    const accessToken = await getAccessToken(env)
+    const res = await fetch(base, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      return data.values || []
+    }
+    const text = await res.text().catch(() => '')
+    // Jika SA gagal, coba API key (jangan throw dulu)
+    if (!apiKey) {
+      throw new Error(`Google Sheets error ${res.status}: ${text.slice(0, 200)}`)
+    }
+    console.warn(`[sheets] SA read gagal (${res.status}) untuk ${sheetName}, coba API key`)
+  } catch (e) {
+    if (!apiKey) throw e
+    // SA belum dikonfigurasi / gagal — lanjut API key
+    if (e?.code !== 'MISSING_WRITE_CREDS' && e?.code !== 'MISSING_SA') {
+      console.warn(`[sheets] SA unavailable: ${e.message}`)
+    }
+  }
+
+  // 2) Fallback API Key (hanya untuk sheet yang publik)
+  if (!apiKey) {
+    throw new Error('GOOGLE_SHEETS_API_KEY / Service Account belum di-set')
+  }
+  const res = await fetch(`${base}?key=${encodeURIComponent(apiKey)}`)
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Google Sheets error ${res.status}: ${text.slice(0, 200)}`)
+    throw new Error(
+      `Google Sheets error ${res.status} (${sheetName} / ${turn || 'default'}): ${text.slice(0, 200)}`
+    )
   }
   const data = await res.json()
   return data.values || []
 }
 
-/** Cell maintenance flag — dibaca dari semua sheet */
+/** Cell maintenance flag */
 const MAINTENANCE_CELL = 'Z1'
 const MAINTENANCE_ACTIVE = 'MAINTENANCE'
 
-/** Cek maintenance: return true jika setidaknya SATU sheet dalam maintenance */
+/** Cek maintenance di semua sheet */
 export async function getMaintenanceMode(env = process.env) {
   const configs = getAllSheetConfigs(env)
-  const apiKey = configs[0]?.apiKey
-  if (!apiKey) return { maintenance: false }
 
   const results = await Promise.allSettled(
-    configs.map(async ({ spreadsheetId, sheetName }) => {
-      const safeSheet = String(sheetName).replace(/'/g, "''")
-      const a1 = `'${safeSheet}'!${MAINTENANCE_CELL}`
-      const url =
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-        `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`
-      const res = await fetch(url)
-      if (!res.ok) return false
-      const data = await res.json()
-      return (data.values?.[0]?.[0] || '').trim() === MAINTENANCE_ACTIVE
+    configs.map(async ({ turn }) => {
+      const rows = await fetchSheetValues(MAINTENANCE_CELL, turn, env)
+      return (rows?.[0]?.[0] || '').trim() === MAINTENANCE_ACTIVE
     })
   )
 

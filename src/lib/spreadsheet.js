@@ -109,16 +109,28 @@ function parseIntervalRow(row, defaultTurn) {
 /** Fetch interval bosses dari semua turn sheet */
 export async function fetchIntervalBosses() {
   const results = []
+  const errors = []
   for (const turn of TURNS) {
     try {
       const rows = await fetchRange('A2:H', turn)
+      let count = 0
       for (const row of rows) {
         const parsed = parseIntervalRow(row, turn)
-        if (parsed) results.push(parsed)
+        if (parsed) {
+          results.push(parsed)
+          count++
+        }
+      }
+      if (count === 0 && rows.length > 1) {
+        console.warn(`[sheets] Turn ${turn}: ${rows.length} baris tapi 0 boss ter-parse (cek format tanggal)`)
       }
     } catch (e) {
       console.warn(`Gagal fetch interval boss untuk turn ${turn}:`, e)
+      errors.push(`${turn}: ${e.message}`)
     }
+  }
+  if (results.length === 0 && errors.length) {
+    throw new Error(`Gagal load boss: ${errors.join('; ')}`)
   }
   return results
 }
@@ -142,7 +154,7 @@ export async function fetchWeeklyBosses() {
   const bossMap = {}
   for (const turn of TURNS) {
     try {
-      const rows = await fetchRange('A25:D', turn)
+      const rows = await fetchRange('A17:D', turn)
       for (const row of rows) {
         const parsed = parseWeeklyRow(row, turn)
         if (!parsed) continue
