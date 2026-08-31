@@ -35,10 +35,11 @@ function normalizeTurn(turn) {
 export function getSheetsConfig(turn = '', env = process.env) {
   const apiKey = env['GOOGLE_SHEETS_API_KEY'] || env['GOOGLE_API_KEY'] || ''
   const turnKey = normalizeTurn(turn)
+  const clean = (v) => String(v || '').replace(/[\r\n]+/g, ' ').trim()
 
   if (turnKey) {
-    const envId = env[`GOOGLE_SHEETS_ID_${turnKey.toUpperCase()}`] || ''
-    const envName = env[`GOOGLE_SHEETS_NAME_${turnKey.toUpperCase()}`] || ''
+    const envId = clean(env[`GOOGLE_SHEETS_ID_${turnKey.toUpperCase()}`])
+    const envName = clean(env[`GOOGLE_SHEETS_NAME_${turnKey.toUpperCase()}`])
     const defaults = DEFAULT_SHEETS[turnKey]
     return {
       apiKey,
@@ -49,8 +50,9 @@ export function getSheetsConfig(turn = '', env = process.env) {
   }
 
   const spreadsheetId =
-    env['GOOGLE_SHEETS_ID'] || DEFAULT_SHEETS.MAFIA.spreadsheetId
-  const sheetName = env['GOOGLE_SHEETS_NAME'] || DEFAULT_SHEETS.MAFIA.sheetName
+    clean(env['GOOGLE_SHEETS_ID']) || DEFAULT_SHEETS.MAFIA.spreadsheetId
+  const sheetName =
+    clean(env['GOOGLE_SHEETS_NAME']) || DEFAULT_SHEETS.MAFIA.sheetName
   return { apiKey, spreadsheetId, sheetName, turn: '' }
 }
 
