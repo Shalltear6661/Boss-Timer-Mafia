@@ -20,10 +20,14 @@ const DAY_MAP = {
 
 function parseDeathDate(str) {
   if (!str || !str.trim()) return null
-  const parts = str.trim().split(/\s+/)
-  if (parts.length < 2) return null
-  const [d, m, y] = parts[0].split('/').map(Number)
-  const [hh, mi] = parts[1].split(':').map(Number)
+  const clean = str.trim().replace(/[\u00A0\u202F\u2007\u2060]/g, ' ').replace(/\s+/g, ' ')
+  const match = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\s+(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  const d = Number(match[1])
+  const m = Number(match[2])
+  const y = Number(match[3])
+  const hh = Number(match[4])
+  const mi = Number(match[5])
   if (!d || !m || !y || Number.isNaN(hh) || Number.isNaN(mi)) return null
   const pad = (n) => String(n).padStart(2, '0')
   return new Date(`${y}-${pad(m)}-${pad(d)}T${pad(hh)}:${pad(mi)}:00+07:00`)
@@ -35,14 +39,23 @@ function parseTime12h(str) {
     .trim()
     .replace(/[\u00A0\u202F\u2007\u2060]/g, ' ')
     .replace(/\s+/g, ' ')
-  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
-  if (!match) return null
-  let h = parseInt(match[1], 10)
-  const m = match[2]
-  const modifier = match[3].toUpperCase()
-  if (modifier === 'PM' && h !== 12) h += 12
-  if (modifier === 'AM' && h === 12) h = 0
-  return `${String(h).padStart(2, '0')}:${m}`
+  const match12 = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i)
+  if (match12) {
+    let h = parseInt(match12[1], 10)
+    const m = match12[2]
+    const modifier = match12[3].toUpperCase()
+    if (modifier === 'PM' && h !== 12) h += 12
+    if (modifier === 'AM' && h === 12) h = 0
+    return `${String(h).padStart(2, '0')}:${m}`
+  }
+  const match24 = clean.match(/^(\d{1,2}):(\d{2})$/)
+  if (match24) {
+    const h = parseInt(match24[1], 10)
+    const m = match24[2]
+    if (h < 0 || h > 23) return null
+    return `${String(h).padStart(2, '0')}:${m}`
+  }
+  return null
 }
 
 function getZonedParts(date, timeZone = 'Asia/Jakarta') {
@@ -152,7 +165,7 @@ async function loadIntervalBosses(config, now) {
 async function loadWeeklyBosses(config, now) {
   const { sheetName, spreadsheetId, apiKey } = config
   const safeSheet = String(sheetName).replace(/'/g, "''")
-  const a1 = `'${safeSheet}'!A30:D`
+  const a1 = `'${safeSheet}'!A25:D`
   const url =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
     `/values/${encodeURIComponent(a1)}?key=${encodeURIComponent(apiKey)}`

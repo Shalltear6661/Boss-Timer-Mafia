@@ -2,56 +2,62 @@
  * Shared Google Sheets fetch — dipakai Vite (dev) & Vercel (production).
  * API key hanya hidup di server / env, tidak pernah dikirim ke browser.
  *
- * Mendukung multi-sheet berdasarkan turn:
- * - MAFIA → GOOGLE_SHEETS_ID_MAFIA / GOOGLE_SHEETS_NAME_MAFIA
- * - MAFIAx2 → GOOGLE_SHEETS_ID_MAFIAX2 / GOOGLE_SHEETS_NAME_MAFIAX2
- * - fallback (tanpa turn atau turn lain) → GOOGLE_SHEETS_ID / GOOGLE_SHEETS_NAME
+ * Multi-sheet berdasarkan turn:
+ * - MAFIA → sheet Boss Timer M1
+ * - MAFIAx2 → sheet Boss Timer M2
  */
+
+/** Default hardcode — dipakai jika env turn-specific belum di-set di Vercel */
+const DEFAULT_SHEETS = {
+  MAFIA: {
+    spreadsheetId: '16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI',
+    sheetName: 'Boss Timer M1',
+  },
+  MAFIAx2: {
+    spreadsheetId: '1O0TW2vSGlqN9XkqP312NgzlrUTkLioWGpoHsVywjyHk',
+    sheetName: 'Boss Timer M2',
+  },
+}
 
 const TURN_SHEETS = ['MAFIA', 'MAFIAx2']
 
-/** Ambil config sheet berdasarkan turn (opsional). */
-export function getSheetsConfig(turn = '', env = process.env) {
-  const apiKey = env['GOOGLE_SHEETS_API_KEY'] || env['GOOGLE_API_KEY'] || ''
-  const turnKey = TURN_SHEETS.find((t) => t.toLowerCase() === String(turn).trim().toLowerCase())
-
-  if (turnKey) {
-    const id = env[`GOOGLE_SHEETS_ID_${turnKey.toUpperCase()}`] || ''
-    const name = env[`GOOGLE_SHEETS_NAME_${turnKey.toUpperCase()}`] || ''
-    if (id && name) {
-      return { apiKey, spreadsheetId: id, sheetName: name }
-    }
-  }
-
-  // Fallback ke config umum
-  const spreadsheetId = env['GOOGLE_SHEETS_ID'] || '16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI'
-  const sheetName = env['GOOGLE_SHEETS_NAME'] || 'Boss Timer M1'
-  return { apiKey, spreadsheetId, sheetName }
+function normalizeTurn(turn) {
+  const t = String(turn || '').trim().toLowerCase()
+  if (t === 'mafia') return 'MAFIA'
+  if (t === 'mafiax2' || t === 'mafia x2' || t === 'mafia-x2') return 'MAFIAx2'
+  return ''
 }
 
-/** Daftar semua konfigurasi sheet yang aktif (untuk fetch all) */
-export function getAllSheetConfigs(env = process.env) {
-  const configs = []
-  const seen = new Set()
+/** Ambil config sheet berdasarkan turn. */
+export function getSheetsConfig(turn = '', env = process.env) {
+  const apiKey = env['GOOGLE_SHEETS_API_KEY'] || env['GOOGLE_API_KEY'] || ''
+  const turnKey = normalizeTurn(turn)
 
-  for (const turn of TURN_SHEETS) {
-    const cfg = getSheetsConfig(turn, env)
-    const key = `${cfg.spreadsheetId}:${cfg.sheetName}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      configs.push({ ...cfg, turn })
+  if (turnKey) {
+    const envId = env[`GOOGLE_SHEETS_ID_${turnKey.toUpperCase()}`] || ''
+    const envName = env[`GOOGLE_SHEETS_NAME_${turnKey.toUpperCase()}`] || ''
+    const defaults = DEFAULT_SHEETS[turnKey]
+    return {
+      apiKey,
+      spreadsheetId: envId || defaults.spreadsheetId,
+      sheetName: envName || defaults.sheetName,
+      turn: turnKey,
     }
   }
 
-  // Fallback config jika belum ada turn-specific
-  const fallback = getSheetsConfig('', env)
-  const fbk = `${fallback.spreadsheetId}:${fallback.sheetName}`
-  if (!seen.has(fbk)) {
-    seen.add(fbk)
-    configs.push({ ...fallback, turn: '' })
-  }
+  // Fallback ke config umum / MAFIA
+  const spreadsheetId =
+    env['GOOGLE_SHEETS_ID'] || DEFAULT_SHEETS.MAFIA.spreadsheetId
+  const sheetName = env['GOOGLE_SHEETS_NAME'] || DEFAULT_SHEETS.MAFIA.sheetName
+  return { apiKey, spreadsheetId, sheetName, turn: '' }
+}
 
-  return configs
+/** Daftar semua konfigurasi sheet yang aktif (selalu 2 sheet berbeda) */
+export function getAllSheetConfigs(env = process.env) {
+  return TURN_SHEETS.map((turn) => ({
+    ...getSheetsConfig(turn, env),
+    turn,
+  }))
 }
 
 /**
@@ -89,7 +95,7 @@ export async function fetchSheetValues(range, turn = '', env = process.env) {
 const MAINTENANCE_CELL = 'Z1'
 const MAINTENANCE_ACTIVE = 'MAINTENANCE'
 
-/** Cek maintenance: return true jika SEMUA sheet dalam maintenance */
+/** Cek maintenance: return true jika setidaknya SATU sheet dalam maintenance */
 export async function getMaintenanceMode(env = process.env) {
   const configs = getAllSheetConfigs(env)
   const apiKey = configs[0]?.apiKey
@@ -109,7 +115,6 @@ export async function getMaintenanceMode(env = process.env) {
     })
   )
 
-  // Maintenance aktif jika setidaknya SATU sheet dalam maintenance
   const anyMaintenance = results.some((r) => r.status === 'fulfilled' && r.value === true)
   return { maintenance: anyMaintenance }
 }

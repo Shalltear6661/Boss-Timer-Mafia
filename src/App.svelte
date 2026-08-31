@@ -89,7 +89,7 @@
     if (!boss?.name) return
     try {
       const deathISO = deathDate.toISOString()
-      const turn = boss._sheetTurn || ''
+      const turn = boss._sheetTurn || boss.turn || ''
       await markBossKilled(boss.name, deathISO, turn)
       bosses = bosses.map((b) =>
         b.id === boss.id ? { ...b, lastDeath: deathDate } : b
@@ -189,13 +189,13 @@
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       try {
-        bosses = JSON.parse(raw).map((b) => ({ ...b, lastDeath: new Date(b.lastDeath) }))
+        bosses = JSON.parse(raw).map((b) => ({ ...b, lastDeath: new Date(b.lastDeath), _sheetTurn: b._sheetTurn || b.turn || '' }))
       } catch (e) {
         console.error('Gagal load data tersimpan, pakai data awal', e)
-        bosses = initialBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath) }))
+        bosses = initialBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath), _sheetTurn: b.turn || '' }))
       }
     } else {
-      bosses = initialBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath) }))
+      bosses = initialBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath), _sheetTurn: b.turn || '' }))
     }
 
     const rawWeekly = localStorage.getItem(WEEKLY_STORAGE_KEY)
@@ -253,7 +253,7 @@
   function persist() {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify(bosses.map((b) => ({ ...b, lastDeath: b.lastDeath.toISOString() })))
+      JSON.stringify(bosses.map((b) => ({ ...b, lastDeath: b.lastDeath.toISOString(), _sheetTurn: b._sheetTurn })))
     )
   }
 
@@ -295,7 +295,7 @@
     killError = ''
     try {
       const deathISO = deathDate ? deathDate.toISOString() : new Date().toISOString()
-      const turn = boss._sheetTurn || ''
+      const turn = boss._sheetTurn || boss.turn || ''
       await markBossKilled(boss.name, deathISO, turn)
       bosses = bosses.map((b) =>
         b.id === boss.id ? { ...b, lastDeath: deathDate || new Date() } : b

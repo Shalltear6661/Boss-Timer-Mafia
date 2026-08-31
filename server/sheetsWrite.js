@@ -27,7 +27,7 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
   const name = (bossName || '').trim()
   if (!name) throw new Error('Nama boss wajib')
 
-  const { spreadsheetId, sheetName } = getSheetsConfig(turn, env)
+  const { spreadsheetId, sheetName, turn: resolvedTurn } = getSheetsConfig(turn, env)
   const accessToken = await getAccessToken(env)
   const deathTime = formatDeathForSheet(deathDate)
 
@@ -49,13 +49,21 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
   let rowIndex = -1
   for (let i = 0; i < rows.length; i++) {
     const cell = (rows[i][0] || '').trim()
+    if (!cell) continue
+    // Header kedua = mulai section weekly — stop
+    if (cell === 'Boss Name') {
+      if (i > 0) break
+      continue
+    }
     if (cell.toLowerCase() === name.toLowerCase()) {
       rowIndex = i
       break
     }
   }
   if (rowIndex < 0) {
-    throw new Error(`Boss "${name}" tidak ditemukan di spreadsheet`)
+    throw new Error(
+      `Boss "${name}" tidak ditemukan di sheet ${sheetName} (turn: ${resolvedTurn || turn || 'default'})`
+    )
   }
 
   const sheetRow = rowIndex + 2
@@ -77,7 +85,14 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
     throw new Error(writeData.error?.message || `Gagal update sheet (${writeRes.status})`)
   }
 
-  return { row: sheetRow, deathTime, name: rows[rowIndex][0].trim() }
+  return {
+    row: sheetRow,
+    deathTime,
+    name: rows[rowIndex][0].trim(),
+    turn: resolvedTurn || turn || '',
+    sheetName,
+    spreadsheetId,
+  }
 }
 
 /** Cell maintenance flag */
