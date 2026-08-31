@@ -48,8 +48,9 @@ export default async function handler(req, res) {
     }
     const deathISO = body.deathTime || body.deathDate || null
     const deathDate = deathISO ? new Date(deathISO) : new Date()
+    const turn = body.turn || ''
 
-    const result = await markBossKilledOnSheet(String(name), process.env, deathDate)
+    const result = await markBossKilledOnSheet(String(name), process.env, deathDate, String(turn))
     res.statusCode = 200
     res.end(JSON.stringify({ ok: true, ...result, by: session.email }))
   } catch (e) {
