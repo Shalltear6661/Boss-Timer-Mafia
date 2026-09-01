@@ -485,11 +485,11 @@
 
 <main>
   <header>
-    <div class="brand">
-      <span class="brand-mark">◈</span>
-      <div>
+    <div class="header-left">
+      <div class="header-brand-row">
+        <img class="brand-mark" src="/3551739.jpg" alt="Mafia Timer" width="40" height="40" />
         <h1>Mafia Timer</h1>
-        <div class="brand-status">
+        <div class="brand-status header-status">
           <a
             class="spreadsheet-status"
             class:live={spreadsheetStatus === 'live'}
@@ -512,7 +512,6 @@
             {/if}
           </a>
         </div>
-        <h2 class="tagline">Bersama MOJO kita kuasai LORDNINE</h2>
       </div>
     </div>
     <div class="header-right">
@@ -567,7 +566,7 @@
           {/if}
         </div>
       {/if}
-      <div class="clock">
+      <div class="clock header-clock">
         <div class="clock-time">
           {formatTimeInZone(now, displayTimeZone, { withSeconds: true })}
           <span class="tz-tag">{tzLabel}</span>
@@ -794,15 +793,24 @@
     padding-bottom: 12px;
     border-bottom: 1px solid #23232f;
   }
-  .brand {
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .header-brand-row {
     display: flex;
     align-items: center;
     gap: 10px;
   }
   .brand-mark {
-    font-size: 20px;
-    color: #f0b428;
-    text-shadow: 0 0 16px rgba(240, 180, 40, 0.6);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: 0 0 12px rgba(240, 180, 40, 0.35);
   }
   h1 {
     font-family: 'Cinzel', serif;
@@ -814,17 +822,8 @@
     background-clip: text;
     color: transparent;
   }
-  .tagline {
-    margin: 1px 0 0;
-    font-size: 11px;
-    color: #f0b428;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 500;
-  }
   .brand-status {
-    margin: 2px 0 1px;
+    margin: 0;
   }
   .brand-status .spreadsheet-status {
     display: inline-flex;
@@ -1486,12 +1485,40 @@
   }
 
   @media (max-width: 719px) {
-    .clock {
+    header {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      text-align: center;
+    }
+    .header-left,
+    .header-right {
+      display: contents;
+    }
+    .header-brand-row {
+      order: 1;
+      justify-content: center;
+    }
+    .header-tools {
+      order: 2;
+      justify-content: center;
+      width: 100%;
+    }
+    .auth-box {
+      order: 3;
+      justify-content: center;
+      width: 100%;
+    }
+    .header-clock {
+      order: 4;
       text-align: center;
       width: 100%;
     }
-    .header-right {
-      justify-content: center;
+    .header-search {
+      order: 5;
+    }
+    .google-btn {
+      margin: 0 auto;
     }
   }
 
