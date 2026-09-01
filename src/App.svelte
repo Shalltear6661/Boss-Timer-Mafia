@@ -1202,12 +1202,21 @@
   }
 
   .section-title {
-    font-size: 12px;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #8a8aa0;
-    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: #f0eef7;
+    font-weight: 700;
     margin: 0 0 12px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border: 1px solid #2a2a38;
+    text-align: center;
   }
 
   .card-grid {
@@ -1252,8 +1261,11 @@
       border-radius: 6px;
     }
     .section-title {
-      font-size: 11px;
+      font-size: 13px;
+      letter-spacing: 0.1em;
       margin: 0 0 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
     }
     section {
       margin-bottom: 16px;
