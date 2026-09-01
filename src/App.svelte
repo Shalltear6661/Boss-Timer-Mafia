@@ -672,7 +672,7 @@
   {/if}
 
   <section>
-    <h2 class="section-title">Field Boss</h2>
+    <h2 class="section-title cooldown">COOLDOWN</h2>
     {#if bossesByTurn.length === 0}
       <p class="empty-hint">
         {#if searching}
@@ -732,7 +732,7 @@
   </section>
 
   <section>
-    <h2 class="section-title">Boss Mingguan</h2>
+    <h2 class="section-title fixed-time">FIXED TIME</h2>
     {#if weeklyTurnCards.length === 0}
       <p class="empty-hint">
         {#if searching}
@@ -1275,14 +1275,34 @@
     font-size: 15px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: #f0eef7;
     font-weight: 700;
     margin: 0 0 12px;
     padding: 11px 16px;
     border-radius: 10px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border: 1px solid #2a2a38;
+    border: 1px solid transparent;
     text-align: center;
+  }
+  .section-title.cooldown {
+    color: #fde68a;
+    background: linear-gradient(
+      135deg,
+      rgba(240, 180, 40, 0.28) 0%,
+      rgba(180, 100, 20, 0.12) 55%,
+      rgba(20, 20, 30, 0.4) 100%
+    );
+    border-color: rgba(240, 180, 40, 0.4);
+    box-shadow: inset 0 1px 0 rgba(255, 220, 120, 0.18);
+  }
+  .section-title.fixed-time {
+    color: #e9d5ff;
+    background: linear-gradient(
+      135deg,
+      rgba(168, 85, 247, 0.28) 0%,
+      rgba(124, 58, 237, 0.12) 55%,
+      rgba(20, 20, 30, 0.4) 100%
+    );
+    border-color: rgba(168, 85, 247, 0.42);
+    box-shadow: inset 0 1px 0 rgba(200, 160, 255, 0.15);
   }
 
   .card-grid {
