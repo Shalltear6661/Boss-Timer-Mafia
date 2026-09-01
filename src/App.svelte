@@ -485,37 +485,13 @@
 
 <main>
   <header>
-    <div class="header-left">
-      <div class="header-brand-row">
-        <img class="brand-mark" src="/3551739.jpg" alt="Mafia Timer" width="40" height="40" />
-        <h1>Mafia Timer</h1>
-        <div class="brand-status header-status">
-          <a
-            class="spreadsheet-status"
-            class:live={spreadsheetStatus === 'live'}
-            class:cache={spreadsheetStatus === 'cache'}
-            class:loading={spreadsheetStatus === 'loading'}
-            href={SPREADSHEET_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Buka spreadsheet di tab baru"
-          >
-            {#if spreadsheetStatus === 'loading'}
-              <span class="dot loading-dot"></span>
-              <span class="label">Memuat...</span>
-            {:else if spreadsheetStatus === 'live'}
-              <span class="dot live-dot"></span>
-              <span class="label">Spreadsheet</span>
-            {:else}
-              <span class="dot cache-dot"></span>
-              <span class="label">Lokal</span>
-            {/if}
-          </a>
-        </div>
-      </div>
+    <div class="header-brand">
+      <img class="brand-mark brand-mark--desktop" src="/3551739.jpg" alt="Mafia Timer" width="40" height="40" />
+      <h1 class="header-title">Mafia Timer</h1>
     </div>
-    <div class="header-right">
+    <div class="header-meta">
       <div class="header-tools">
+        <img class="brand-mark brand-mark--mobile" src="/3551739.jpg" alt="Mafia Timer" width="40" height="40" />
         <div class="tz-switch" role="group" aria-label="Zona waktu">
           {#each TIMEZONE_OPTIONS as opt (opt.id)}
             <button
@@ -793,16 +769,11 @@
     padding-bottom: 12px;
     border-bottom: 1px solid #23232f;
   }
-  .header-left {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-  .header-brand-row {
+  .header-brand {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
   }
   .brand-mark {
     width: 40px;
@@ -812,7 +783,10 @@
     flex-shrink: 0;
     box-shadow: 0 0 12px rgba(240, 180, 40, 0.35);
   }
-  h1 {
+  .brand-mark--mobile {
+    display: none;
+  }
+  .header-title {
     font-family: 'Cinzel', serif;
     font-size: 20px;
     margin: 0;
@@ -874,7 +848,7 @@
   .clock {
     text-align: right;
   }
-  .header-right {
+  .header-meta {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -1486,36 +1460,35 @@
 
   @media (max-width: 719px) {
     header {
-      display: grid;
-      grid-template-columns: 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 10px;
       text-align: center;
     }
-    .header-left,
-    .header-right {
-      display: contents;
+    .header-brand {
+      display: none;
     }
-    .header-brand-row {
-      order: 1;
-      justify-content: center;
+    .brand-mark--mobile {
+      display: block;
+      width: 34px;
+      height: 34px;
+    }
+    .header-meta {
+      flex-direction: column;
+      width: 100%;
+      gap: 10px;
     }
     .header-tools {
-      order: 2;
       justify-content: center;
       width: 100%;
     }
     .auth-box {
-      order: 3;
       justify-content: center;
       width: 100%;
     }
     .header-clock {
-      order: 4;
       text-align: center;
       width: 100%;
-    }
-    .header-search {
-      order: 5;
     }
     .google-btn {
       margin: 0 auto;
