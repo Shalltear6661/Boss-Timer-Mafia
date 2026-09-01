@@ -747,9 +747,9 @@
   }
 
   main {
-    max-width: 960px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 16px 14px 48px;
+    padding: 22px 20px 56px;
   }
 
   header {
@@ -1100,25 +1100,16 @@
     color: #fff;
   }
 
-  .section-title {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #8a8aa0;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
-
   .turn-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    gap: 14px;
     align-items: start;
   }
   .turn-panel {
     margin-bottom: 0;
-    padding: 8px 10px 10px;
-    border-radius: 10px;
+    padding: 14px 14px 16px;
+    border-radius: 14px;
     border: 1px solid #2a2a38;
     background: #14141e;
     min-width: 0;
@@ -1142,10 +1133,10 @@
   .turn-label {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin: 0 0 8px;
+    gap: 8px;
+    margin: 0 0 12px;
     font-family: 'Cinzel', serif;
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: 0.03em;
     color: #c8c8d8;
@@ -1180,26 +1171,26 @@
   }
   .turn-count {
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     color: inherit;
     opacity: 0.75;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 999px;
-    padding: 0 6px;
+    padding: 1px 8px;
     margin-left: 2px;
   }
   .turn-toggle {
     margin-left: auto;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     color: inherit;
     background: rgba(0, 0, 0, 0.28);
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 6px;
-    padding: 3px 8px;
+    border-radius: 8px;
+    padding: 5px 10px;
     cursor: pointer;
   }
   .turn-toggle:hover {
@@ -1207,25 +1198,71 @@
   }
 
   section {
-    margin-bottom: 18px;
+    margin-bottom: 28px;
+  }
+
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #8a8aa0;
+    font-weight: 600;
+    margin: 0 0 12px;
   }
 
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
   }
   .turn-cards {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
   .weekly-turn-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
   }
 
   @media (max-width: 700px) {
+    main {
+      padding: 14px 12px 40px;
+    }
     .turn-grid,
     .weekly-turn-grid {
       grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .turn-panel {
+      padding: 8px 10px 10px;
+      border-radius: 10px;
+    }
+    .turn-label {
+      font-size: 13px;
+      margin: 0 0 8px;
+      gap: 6px;
+    }
+    .turn-count {
+      font-size: 10px;
+      padding: 0 6px;
+    }
+    .turn-toggle {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .section-title {
+      font-size: 11px;
+      margin: 0 0 8px;
+    }
+    section {
+      margin-bottom: 16px;
+    }
+    .card-grid {
+      gap: 8px;
+    }
+    .turn-cards {
+      gap: 8px;
     }
   }
 

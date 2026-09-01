@@ -71,12 +71,12 @@
   .card {
     background: #1a1a26;
     border: 1px solid #2a2a38;
-    border-left: 3px solid #35354a;
-    border-radius: 10px;
-    padding: 8px 10px;
+    border-left: 4px solid #35354a;
+    border-radius: 12px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
   }
   .card.turn-mafia {
     border-left-color: #3b82f6;
@@ -100,30 +100,30 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
+    gap: 12px;
   }
   .identity {
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 3px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 13px;
+    font-size: 17px;
     color: #f0eef7;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .meta {
-    font-size: 10px;
+    font-size: 12px;
     color: #7a7a90;
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 15px;
+    font-size: 22px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #d8d8e6;
@@ -138,24 +138,24 @@
   .row-sub {
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-height: 22px;
+    gap: 8px;
+    min-height: 28px;
   }
   .next {
     flex: 1;
     min-width: 0;
-    font-size: 10px;
+    font-size: 13px;
     color: #8a8aa0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .status {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    padding: 2px 6px;
+    padding: 3px 8px;
     border-radius: 999px;
     flex-shrink: 0;
   }
@@ -171,9 +171,9 @@
   }
   .kill {
     flex-shrink: 0;
-    padding: 3px 8px;
-    border-radius: 6px;
-    font-size: 10px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
     border: none;
@@ -187,5 +187,42 @@
   .kill:disabled {
     opacity: 0.6;
     cursor: wait;
+  }
+
+  @media (max-width: 700px) {
+    .card {
+      border-left-width: 3px;
+      border-radius: 10px;
+      padding: 9px 11px;
+      gap: 4px;
+    }
+    h4 {
+      font-size: 13px;
+    }
+    .meta {
+      font-size: 10px;
+    }
+    .countdown {
+      font-size: 15px;
+    }
+    .row-main {
+      gap: 8px;
+    }
+    .row-sub {
+      gap: 6px;
+      min-height: 22px;
+    }
+    .next {
+      font-size: 10px;
+    }
+    .status {
+      font-size: 9px;
+      padding: 2px 6px;
+    }
+    .kill {
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 10px;
+    }
   }
 </style>

@@ -105,12 +105,12 @@
   .card {
     background: #1a1a26;
     border: 1px solid #2a2a38;
-    border-left: 3px solid #4a3a6a;
-    border-radius: 10px;
-    padding: 8px 10px;
+    border-left: 4px solid #4a3a6a;
+    border-radius: 12px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 10px;
   }
   .card.turn-mafia {
     border-left-color: #3b82f6;
@@ -133,38 +133,38 @@
   .head {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
   .head-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 13px;
+    font-size: 17px;
     color: #f0eef7;
     letter-spacing: 0.03em;
   }
   .count {
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     color: #8a8aa0;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 999px;
-    padding: 0 6px;
-    line-height: 16px;
+    padding: 1px 8px;
+    line-height: 18px;
   }
   .next-line {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
+    gap: 12px;
   }
   .next-name {
-    font-size: 11px;
+    font-size: 14px;
     color: #b8b0d8;
     white-space: nowrap;
     overflow: hidden;
@@ -172,7 +172,7 @@
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 14px;
+    font-size: 22px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #d8d8e6;
@@ -190,17 +190,17 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 5px;
   }
   .boss-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
+    gap: 10px;
+    font-size: 13px;
     color: #8a8aa0;
-    padding: 4px 7px;
-    border-radius: 6px;
+    padding: 7px 10px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.03);
   }
   .boss-list li.active {
@@ -225,23 +225,69 @@
   .when {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
   }
   .min-toggle {
     align-self: stretch;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 600;
     color: #a8a8b8;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    padding: 4px 8px;
+    border-radius: 8px;
+    padding: 7px 10px;
     cursor: pointer;
   }
   .min-toggle:hover {
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  @media (max-width: 700px) {
+    .card {
+      border-left-width: 3px;
+      border-radius: 10px;
+      padding: 9px 11px;
+      gap: 5px;
+    }
+    .head {
+      gap: 4px;
+    }
+    .head-left {
+      gap: 6px;
+    }
+    h4 {
+      font-size: 13px;
+    }
+    .count {
+      font-size: 10px;
+      padding: 0 6px;
+      line-height: 16px;
+    }
+    .next-name {
+      font-size: 11px;
+    }
+    .countdown {
+      font-size: 15px;
+    }
+    .boss-list {
+      gap: 3px;
+    }
+    .boss-list li {
+      font-size: 11px;
+      padding: 4px 7px;
+      border-radius: 6px;
+      gap: 8px;
+    }
+    .when {
+      font-size: 10px;
+    }
+    .min-toggle {
+      font-size: 10px;
+      border-radius: 6px;
+      padding: 4px 8px;
+    }
   }
 </style>
