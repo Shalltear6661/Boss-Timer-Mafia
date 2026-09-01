@@ -43,32 +43,28 @@
   class:turn-mafia={boss.turn === 'MAFIA'}
   class:turn-mafiax2={boss.turn === 'MAFIAx2'}
 >
-  {#if isUp}
-    <div class="spawn-badge">⚔ SPAWN!</div>
-  {:else if isSoon}
-    <div class="soon-badge">Akan Spawn</div>
-  {/if}
-  <div class="top">
-    <h4>{boss.name}</h4>
-    <span class="lv">Lv {boss.level}</span>
+  <div class="row-main">
+    <div class="identity">
+      <h4>{boss.name}</h4>
+      <span class="meta">Lv {boss.level} · {boss.spawnIntervalHours}j</span>
+    </div>
+    <div class="countdown" class:soon-text={isSoon} class:up-text={isUp}>
+      {formatCountdown(msLeft)}
+    </div>
   </div>
-  {#if boss.turn}
-    <span class="turn-badge" class:mafia={boss.turn === 'MAFIA'} class:mafiax2={boss.turn === 'MAFIAx2'}>
-      {boss.turn}
-    </span>
-  {/if}
-  <div class="countdown">{formatCountdown(msLeft)}</div>
-  <div class="details">
-    <span>Interval {boss.spawnIntervalHours}j</span>
-    <span>Next {nextClock}</span>
+  <div class="row-sub">
+    <span class="next">Next {nextClock}</span>
+    {#if isUp}
+      <span class="status up-status">SPAWN</span>
+    {:else if isSoon}
+      <span class="status soon-status">Soon</span>
+    {/if}
+    {#if showKill && onMarkKilled}
+      <button class="kill" disabled={killing} on:click={() => onMarkKilled(boss)}>
+        {killing ? '...' : 'Mati'}
+      </button>
+    {/if}
   </div>
-  {#if showKill && onMarkKilled}
-  <div class="actions">
-    <button class="primary" disabled={killing} on:click={() => onMarkKilled(boss)}>
-      {killing ? 'Menyimpan...' : 'Tandai Mati'}
-    </button>
-  </div>
-  {/if}
 </article>
 
 <style>
@@ -76,138 +72,120 @@
     background: #1a1a26;
     border: 1px solid #2a2a38;
     border-left: 3px solid #35354a;
-    border-radius: 12px;
-    padding: 14px 16px;
+    border-radius: 10px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: border-color 0.2s, background 0.2s;
+    gap: 4px;
   }
   .card.turn-mafia {
     border-left-color: #3b82f6;
-    background: rgba(37, 99, 235, 0.1);
+    background: rgba(37, 99, 235, 0.08);
   }
   .card.turn-mafiax2 {
     border-left-color: #a855f7;
-    background: rgba(147, 51, 234, 0.12);
+    background: rgba(147, 51, 234, 0.1);
   }
   .card.soon {
-    border: 1px solid rgba(240, 180, 40, 0.35);
-    border-top: 4px solid #f0b428;
+    border-color: rgba(240, 180, 40, 0.4);
     border-left-color: #f0b428;
-    border-left-width: 3px;
-    background: linear-gradient(180deg, rgba(240, 180, 40, 0.08) 0%, rgba(26, 26, 38, 0.95) 40%);
-    box-shadow: 0 0 20px -8px rgba(240, 180, 40, 0.35);
+    background: rgba(240, 180, 40, 0.08);
   }
   .card.up {
-    border: 1px solid rgba(224, 72, 60, 0.45);
-    border-top: 4px solid #e0483c;
+    border-color: rgba(224, 72, 60, 0.45);
     border-left-color: #e0483c;
-    border-left-width: 3px;
-    background: linear-gradient(180deg, rgba(224, 72, 60, 0.1) 0%, rgba(26, 26, 38, 0.95) 40%);
-    box-shadow: 0 0 20px -8px rgba(224, 72, 60, 0.4);
+    background: rgba(224, 72, 60, 0.1);
   }
-  .spawn-badge {
-    align-self: flex-start;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(224, 72, 60, 0.2);
-    color: #ff6b6b;
-    border: 1px solid rgba(224, 72, 60, 0.4);
-  }
-  .soon-badge {
-    align-self: flex-start;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(240, 180, 40, 0.15);
-    color: #f0b428;
-    border: 1px solid rgba(240, 180, 40, 0.35);
-  }
-  .top {
+  .row-main {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .identity {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 15px;
+    font-size: 13px;
     color: #f0eef7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
-  .turn-badge {
-    align-self: flex-start;
+  .meta {
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 3px 9px;
-    border-radius: 999px;
-    background: #2a2a38;
-    color: #a8a8b8;
-    border: 1px solid transparent;
-  }
-  .turn-badge.mafia {
-    background: rgba(59, 130, 246, 0.28);
-    color: #bfdbfe;
-    border-color: rgba(59, 130, 246, 0.5);
-  }
-  .turn-badge.mafiax2 {
-    background: rgba(168, 85, 247, 0.3);
-    color: #f3e8ff;
-    border-color: rgba(168, 85, 247, 0.55);
-  }
-  .lv {
-    font-size: 11px;
-    color: #8a8aa0;
+    color: #7a7a90;
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 22px;
+    font-size: 15px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #d8d8e6;
+    flex-shrink: 0;
   }
-  .soon .countdown {
+  .countdown.soon-text {
     color: #f0b428;
   }
-  .up .countdown {
+  .countdown.up-text {
     color: #ff6b6b;
   }
-  .details {
+  .row-sub {
     display: flex;
-    justify-content: space-between;
-    font-size: 11.5px;
-    color: #8a8aa0;
+    align-items: center;
+    gap: 6px;
+    min-height: 22px;
   }
-  .actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 4px;
-  }
-  button {
+  .next {
     flex: 1;
-    padding: 7px 8px;
-    border-radius: 7px;
-    font-size: 12px;
+    min-width: 0;
+    font-size: 10px;
+    color: #8a8aa0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .status {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .soon-status {
+    color: #f0b428;
+    background: rgba(240, 180, 40, 0.15);
+    border: 1px solid rgba(240, 180, 40, 0.3);
+  }
+  .up-status {
+    color: #ff6b6b;
+    background: rgba(224, 72, 60, 0.18);
+    border: 1px solid rgba(224, 72, 60, 0.35);
+  }
+  .kill {
+    flex-shrink: 0;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
     cursor: pointer;
     border: none;
     font-family: inherit;
-  }
-  button:disabled {
-    opacity: 0.6;
-    cursor: wait;
-  }
-  .primary {
     background: #3a3a52;
     color: #eee;
   }
-  .primary:hover:not(:disabled) {
+  .kill:hover:not(:disabled) {
     background: #47476a;
+  }
+  .kill:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
 </style>

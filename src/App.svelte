@@ -580,24 +580,20 @@
   {#if ENABLE_MARK_KILLED && !user.authenticated}
     <div class="role-banner">
       {#if googleClientId}
-        Tombol <strong>Sign in with Google</strong> ada di kanan atas (sebelah jam). Login sebagai Editor untuk Tandai Mati.
+        Login Google di kanan atas untuk Tandai Mati (Editor).
       {:else}
-        Tombol login belum muncul karena <code>GOOGLE_OAUTH_CLIENT_ID</code> masih kosong di <code>.env</code> / Vercel.
-        Buat OAuth Client tipe <strong>Web application</strong>, isi Client ID, restart dev server / Redeploy.
+        Login belum siap — set <code>GOOGLE_OAUTH_CLIENT_ID</code>.
       {/if}
     </div>
   {:else if ENABLE_MARK_KILLED && !canEdit}
     <div class="role-banner view">
-      Anda login sebagai <strong>{user.email}</strong> (view-only). Hubungi admin untuk ditambahkan ke daftar Editor.
+      View-only: <strong>{user.email}</strong>
     </div>
   {/if}
 
   {#if !notifEnabled && notifSupported}
     <div class="notif-banner">
-      <span>
-        Aktifkan notifikasi + Web Push agar peringatan 10 menit / 5 menit / spawn tetap muncul
-        meski browser di-minimize (mobile).
-      </span>
+      <span>Aktifkan notifikasi agar alert spawn tetap muncul saat minimize.</span>
       <button
         on:click={async () => {
           const result = await enableNotificationsWithPush()
@@ -605,12 +601,12 @@
           pushEnabled = result.push
         }}
       >
-        Izinkan Notifikasi & Push
+        Izinkan
       </button>
     </div>
   {:else if notifEnabled && pushSupported && !pushEnabled}
     <div class="notif-banner">
-      <span>Notifikasi lokal aktif. Aktifkan Web Push agar tetap jalan saat app di-minimize.</span>
+      <span>Aktifkan Web Push untuk notifikasi di background.</span>
       <button
         on:click={async () => {
           const result = await enableNotificationsWithPush()
@@ -618,7 +614,7 @@
           pushEnabled = result.push
         }}
       >
-        Aktifkan Web Push
+        Aktifkan Push
       </button>
     </div>
   {/if}
@@ -643,7 +639,7 @@
   {/if}
 
   <section>
-    <h2 class="section-title">Field Boss (Interval)</h2>
+    <h2 class="section-title">Field Boss</h2>
     {#if bossesByTurn.length === 0}
       <p class="empty-hint">
         {#if searching}
@@ -669,7 +665,7 @@
         >
           <h3 class="turn-label">
             <span class="turn-dot"></span>
-            {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : `Turn ${turnLabel}`}
+            {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : turnLabel}
             <span class="turn-count">{turnBosses.length}</span>
             {#if turnBosses.length > minimizedBossCount}
               <button
@@ -678,7 +674,7 @@
                 aria-expanded={!minimized}
                 on:click={() => toggleTurnMinimized(turnKey)}
               >
-                {minimized ? `Tampilkan semua (${turnBosses.length})` : 'Minimize'}
+                {minimized ? `Semua (${turnBosses.length})` : 'Minimize'}
               </button>
             {/if}
           </h3>
@@ -695,16 +691,13 @@
               />
             {/each}
           </div>
-          {#if minimized && turnBosses.length > minimizedBossCount}
-            <p class="min-hint">Menampilkan {minimizedBossCount} dari {turnBosses.length} boss</p>
-          {/if}
         </div>
       {/each}
     {/if}
   </section>
 
   <section>
-    <h2 class="section-title">Boss Mingguan (Jadwal Tetap)</h2>
+    <h2 class="section-title">Boss Mingguan</h2>
     {#if weeklyTurnCards.length === 0}
       <p class="empty-hint">
         {#if searching}
@@ -734,11 +727,9 @@
   </section>
 
   <footer>
-    <p class="footer-note">
-      Login sebagai Editor untuk Tandai Mati. Data sync dari spreadsheet tiap menit.
-    </p>
+    <p class="footer-note">Sync spreadsheet tiap menit · Editor: Tandai Mati</p>
     <button class="link" on:click={refreshFromSpreadsheet} disabled={syncing}>
-      {syncing ? 'Menyinkronkan...' : 'Refresh data sekarang'}
+      {syncing ? 'Menyinkronkan...' : 'Refresh data'}
     </button>
   </footer>
 </main>
@@ -756,7 +747,7 @@
   main {
     max-width: 960px;
     margin: 0 auto;
-    padding: 28px 18px 70px;
+    padding: 16px 14px 48px;
   }
 
   header {
@@ -764,24 +755,24 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-bottom: 26px;
-    padding-bottom: 20px;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
     border-bottom: 1px solid #23232f;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
   }
   .brand-mark {
-    font-size: 26px;
+    font-size: 20px;
     color: #f0b428;
     text-shadow: 0 0 16px rgba(240, 180, 40, 0.6);
   }
   h1 {
     font-family: 'Cinzel', serif;
-    font-size: 24px;
+    font-size: 20px;
     margin: 0;
     letter-spacing: 0.02em;
     background: linear-gradient(135deg, #fff, #c9b8ff);
@@ -790,16 +781,16 @@
     color: transparent;
   }
   .tagline {
-    margin: 2px 0 0;
-    font-size: 14px;
+    margin: 1px 0 0;
+    font-size: 11px;
     color: #f0b428;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     font-family: 'Inter', system-ui, sans-serif;
     font-weight: 500;
   }
   .brand-status {
-    margin: 4px 0 2px;
+    margin: 2px 0 1px;
   }
   .brand-status .spreadsheet-status {
     display: inline-flex;
@@ -957,17 +948,17 @@
     background: rgba(240, 180, 40, 0.08);
   }
   .role-banner code {
-    font-size: 12px;
+    font-size: 11px;
     color: #e8e0ff;
   }
   .role-banner {
-    margin-bottom: 16px;
-    padding: 10px 14px;
-    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
     background: rgba(106, 90, 205, 0.12);
     border: 1px solid rgba(106, 90, 205, 0.35);
     color: #c8c0e8;
-    font-size: 13px;
+    font-size: 12px;
   }
   .role-banner.view {
     background: rgba(240, 180, 40, 0.08);
@@ -976,12 +967,12 @@
   }
   .clock-time {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     color: #d8d8e6;
   }
   .clock-date {
-    font-size: 11px;
+    font-size: 10px;
     color: #7a7a90;
     text-transform: capitalize;
   }
@@ -1016,23 +1007,23 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 24px;
-    padding: 12px 16px;
-    border-radius: 12px;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
     background: rgba(106, 90, 205, 0.12);
     border: 1px solid rgba(106, 90, 205, 0.35);
-    font-size: 13px;
+    font-size: 12px;
     color: #c8c0e8;
   }
   .notif-banner button {
     background: #4a3a8a;
     border: none;
     color: #fff;
-    padding: 8px 14px;
-    border-radius: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     font-family: inherit;
   }
@@ -1041,23 +1032,23 @@
   }
   .empty-hint {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     color: #6a6a80;
   }
   .kill-error {
-    margin-bottom: 16px;
-    padding: 10px 14px;
-    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
     background: rgba(224, 72, 60, 0.12);
     border: 1px solid rgba(224, 72, 60, 0.4);
     color: #ff8478;
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .search-empty {
-    margin-bottom: 18px;
-    padding: 12px 14px;
-    border-radius: 10px;
+    margin-bottom: 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px dashed #2a2a38;
   }
@@ -1065,18 +1056,18 @@
   .search-bar {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 8px;
+    margin-bottom: 12px;
   }
   .search-input {
     flex: 1;
     min-width: 0;
-    padding: 11px 14px;
-    border-radius: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
     border: 1px solid #2a2a38;
     background: #14141e;
     color: #eee;
-    font-size: 14px;
+    font-size: 13px;
     font-family: inherit;
     outline: none;
     transition: border-color 0.15s, box-shadow 0.15s;
@@ -1086,10 +1077,10 @@
   }
   .search-input:focus {
     border-color: rgba(160, 140, 224, 0.55);
-    box-shadow: 0 0 0 3px rgba(124, 92, 200, 0.18);
+    box-shadow: 0 0 0 2px rgba(124, 92, 200, 0.18);
   }
   .search-meta {
-    font-size: 12px;
+    font-size: 11px;
     color: #8a8aa0;
     white-space: nowrap;
   }
@@ -1097,9 +1088,9 @@
     border: 1px solid #2a2a38;
     background: #1a1a26;
     color: #c8c8d8;
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
     cursor: pointer;
   }
   .search-clear:hover {
@@ -1108,18 +1099,18 @@
   }
 
   .section-title {
-    font-size: 13px;
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.07em;
     color: #8a8aa0;
     font-weight: 600;
-    margin: 0 0 14px;
+    margin: 0 0 8px;
   }
 
   .turn-panel {
-    margin-bottom: 16px;
-    padding: 14px 16px 16px;
-    border-radius: 14px;
+    margin-bottom: 10px;
+    padding: 8px 10px 10px;
+    border-radius: 10px;
     border: 1px solid #2a2a38;
     background: #14141e;
   }
@@ -1144,12 +1135,12 @@
   .turn-label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin: 0 0 12px;
+    gap: 6px;
+    margin: 0 0 8px;
     font-family: 'Cinzel', serif;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     color: #c8c8d8;
   }
   .turn-panel.mafia .turn-label {
@@ -1162,77 +1153,72 @@
     color: #cbd5e1;
   }
   .turn-dot {
-    width: 9px;
-    height: 9px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #6a6a80;
     flex-shrink: 0;
   }
   .turn-panel.mafia .turn-dot {
     background: #3b82f6;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.7);
   }
   .turn-panel.mafiax2 .turn-dot {
     background: #a855f7;
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.7);
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.7);
   }
   .turn-panel.noturn .turn-dot {
     background: #94a3b8;
-    box-shadow: 0 0 10px rgba(148, 163, 184, 0.5);
+    box-shadow: 0 0 8px rgba(148, 163, 184, 0.5);
   }
   .turn-count {
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: inherit;
     opacity: 0.75;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 999px;
-    padding: 1px 8px;
+    padding: 0 6px;
     margin-left: 2px;
   }
   .turn-toggle {
     margin-left: auto;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: inherit;
     background: rgba(0, 0, 0, 0.28);
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 8px;
-    padding: 4px 10px;
+    border-radius: 6px;
+    padding: 3px 8px;
     cursor: pointer;
   }
   .turn-toggle:hover {
     background: rgba(255, 255, 255, 0.08);
   }
-  .min-hint {
-    margin: 10px 0 0;
-    font-size: 12px;
-    color: #8a8aa0;
-  }
 
   section {
-    margin-bottom: 34px;
+    margin-bottom: 18px;
   }
 
   .card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
   }
   .weekly-turn-grid {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
 
   footer {
     text-align: center;
-    margin-top: 10px;
+    margin-top: 6px;
   }
   .footer-note {
-    margin: 0 0 10px;
-    font-size: 12px;
+    margin: 0 0 6px;
+    font-size: 11px;
     color: #6a6a80;
   }
   .link {

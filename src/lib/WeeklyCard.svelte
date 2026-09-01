@@ -7,7 +7,7 @@
   export let timeZone = 'Asia/Jakarta'
   export let tzLabel = 'WIB'
   export let minimized = true
-  export let minCount = 4
+  export let minCount = 2
   export let onToggleMinimize = null
 
   function formatCountdown(ms) {
@@ -52,7 +52,6 @@
   $: isUp = msLeft <= 0
   $: canMinimize = rows.length > minCount
   $: visibleRows = minimized && canMinimize ? rows.slice(0, minCount) : rows
-  $: nextDetail = next ? `${next.dayLabel} ${next.clockLabel}` : ''
 </script>
 
 <article
@@ -62,27 +61,25 @@
   class:turn-mafia={turn === 'MAFIA'}
   class:turn-mafiax2={turn === 'MAFIAx2'}
 >
-  {#if isUp}
-    <div class="spawn-badge">⚔ SPAWN!</div>
-  {:else if isSoon}
-    <div class="soon-badge">Akan Spawn</div>
-  {/if}
-  <div class="top">
-    <h4>{turn}</h4>
-    <span class="count">{bosses.length} boss</span>
-  </div>
-  {#if next}
-    <div class="next-boss">Next: {next.boss.name}</div>
-    <div class="countdown">{formatCountdown(msLeft)}</div>
-    <div class="details">
-      <span>Mingguan</span>
-      <span>{nextDetail}</span>
+  <div class="head">
+    <div class="head-left">
+      <h4>{turn}</h4>
+      <span class="count">{bosses.length}</span>
     </div>
-  {/if}
+    {#if next}
+      <div class="next-line">
+        <span class="next-name">{next.boss.name}</span>
+        <span class="countdown" class:soon-text={isSoon} class:up-text={isUp}>
+          {formatCountdown(msLeft)}
+        </span>
+      </div>
+    {/if}
+  </div>
+
   <ul class="boss-list">
     {#each visibleRows as row (row.boss.id)}
       <li
-        class:active={row.boss.id === next?.boss.id && !(row.msLeft <= 10 * 60 * 1000)}
+        class:active={row.boss.id === next?.boss.id && !isSoon && !isUp}
         class:soon-row={row.msLeft <= 10 * 60 * 1000 && row.msLeft > 0}
         class:spawn-row={row.msLeft <= 0}
       >
@@ -91,6 +88,7 @@
       </li>
     {/each}
   </ul>
+
   {#if canMinimize}
     <button
       type="button"
@@ -98,7 +96,7 @@
       aria-expanded={!minimized}
       on:click={() => onToggleMinimize && onToggleMinimize()}
     >
-      {minimized ? `Tampilkan semua (${rows.length})` : 'Minimize'}
+      {minimized ? `Semua (${rows.length})` : 'Minimize'}
     </button>
   {/if}
 </article>
@@ -108,156 +106,139 @@
     background: #1a1a26;
     border: 1px solid #2a2a38;
     border-left: 3px solid #4a3a6a;
-    border-radius: 12px;
-    padding: 14px 16px;
+    border-radius: 10px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: border-color 0.2s, background 0.2s;
+    gap: 5px;
   }
   .card.turn-mafia {
     border-left-color: #3b82f6;
-    background: rgba(37, 99, 235, 0.1);
+    background: rgba(37, 99, 235, 0.08);
   }
   .card.turn-mafiax2 {
     border-left-color: #a855f7;
-    background: rgba(147, 51, 234, 0.12);
+    background: rgba(147, 51, 234, 0.1);
   }
   .card.soon {
-    border: 1px solid rgba(240, 180, 40, 0.35);
-    border-top: 4px solid #f0b428;
+    border-color: rgba(240, 180, 40, 0.4);
     border-left-color: #f0b428;
-    border-left-width: 3px;
-    background: linear-gradient(180deg, rgba(240, 180, 40, 0.08) 0%, rgba(26, 26, 38, 0.95) 40%);
-    box-shadow: 0 0 20px -8px rgba(240, 180, 40, 0.35);
+    background: rgba(240, 180, 40, 0.08);
   }
   .card.up {
-    border: 1px solid rgba(224, 72, 60, 0.45);
-    border-top: 4px solid #e0483c;
+    border-color: rgba(224, 72, 60, 0.45);
     border-left-color: #e0483c;
-    border-left-width: 3px;
-    background: linear-gradient(180deg, rgba(224, 72, 60, 0.1) 0%, rgba(26, 26, 38, 0.95) 40%);
-    box-shadow: 0 0 20px -8px rgba(224, 72, 60, 0.4);
+    background: rgba(224, 72, 60, 0.1);
   }
-  .spawn-badge {
-    align-self: flex-start;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(224, 72, 60, 0.2);
-    color: #ff6b6b;
-    border: 1px solid rgba(224, 72, 60, 0.4);
-  }
-  .soon-badge {
-    align-self: flex-start;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(240, 180, 40, 0.15);
-    color: #f0b428;
-    border: 1px solid rgba(240, 180, 40, 0.35);
-  }
-  .top {
+  .head {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .head-left {
+    display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
   h4 {
     margin: 0;
     font-family: 'Cinzel', serif;
-    font-size: 16px;
+    font-size: 13px;
     color: #f0eef7;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
   }
   .count {
-    font-size: 11px;
+    font-size: 10px;
+    font-weight: 600;
     color: #8a8aa0;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 0 6px;
+    line-height: 16px;
   }
-  .next-boss {
-    font-size: 12px;
-    color: #c4b5fd;
-    font-weight: 500;
+  .next-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .next-name {
+    font-size: 11px;
+    color: #b8b0d8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .countdown {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 22px;
+    font-size: 14px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: #d8d8e6;
+    flex-shrink: 0;
   }
-  .soon .countdown {
+  .countdown.soon-text {
     color: #f0b428;
   }
-  .up .countdown {
+  .countdown.up-text {
     color: #ff6b6b;
-  }
-  .details {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 11px;
-    color: #8a8aa0;
   }
   .boss-list {
     list-style: none;
-    margin: 4px 0 0;
+    margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
   }
   .boss-list li {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
-    font-size: 12px;
+    gap: 8px;
+    font-size: 11px;
     color: #8a8aa0;
-    padding: 5px 8px;
-    border-radius: 7px;
+    padding: 4px 7px;
+    border-radius: 6px;
     background: rgba(255, 255, 255, 0.03);
   }
   .boss-list li.active {
     color: #e8e4ff;
-    background: rgba(124, 92, 200, 0.18);
-    border: 1px solid rgba(160, 140, 224, 0.35);
+    background: rgba(124, 92, 200, 0.16);
   }
   .boss-list li.soon-row {
     color: #f0b428;
-    background: rgba(240, 180, 40, 0.12);
-    border: 1px solid rgba(240, 180, 40, 0.35);
+    background: rgba(240, 180, 40, 0.1);
   }
   .boss-list li.spawn-row {
     color: #ff6b6b;
     background: rgba(224, 72, 60, 0.12);
-    border: 1px solid rgba(224, 72, 60, 0.35);
     font-weight: 600;
   }
   .name {
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .when {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-variant-numeric: tabular-nums;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .min-toggle {
     align-self: stretch;
-    margin-top: 2px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
-    color: #b8b8c8;
-    background: rgba(0, 0, 0, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
-    padding: 6px 10px;
+    color: #a8a8b8;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 4px 8px;
     cursor: pointer;
   }
   .min-toggle:hover {
