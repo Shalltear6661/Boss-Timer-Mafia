@@ -119,6 +119,8 @@
     'serviceWorker' in navigator &&
     'PushManager' in window
   let searchQuery = ''
+  let searchOpen = false
+  let searchInputEl
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
   let isMobile =
@@ -150,6 +152,18 @@
     } catch {
       /* ignore */
     }
+  }
+
+  function toggleSearch() {
+    searchOpen = !searchOpen
+    if (searchOpen) {
+      requestAnimationFrame(() => searchInputEl?.focus())
+    }
+  }
+
+  function clearSearch() {
+    searchQuery = ''
+    searchOpen = false
   }
 
   function loadTurnMinimized() {
@@ -502,18 +516,34 @@
       </div>
     </div>
     <div class="header-right">
-      <div class="tz-switch" role="group" aria-label="Zona waktu">
-        {#each TIMEZONE_OPTIONS as opt (opt.id)}
-          <button
-            type="button"
-            class="tz-btn"
-            class:active={tzId === opt.id}
-            on:click={() => setTimezone(opt.id)}
-            title={`${opt.label} (${opt.short})`}
-          >
-            {opt.label}
-          </button>
-        {/each}
+      <div class="header-tools">
+        <div class="tz-switch" role="group" aria-label="Zona waktu">
+          {#each TIMEZONE_OPTIONS as opt (opt.id)}
+            <button
+              type="button"
+              class="tz-btn"
+              class:active={tzId === opt.id}
+              on:click={() => setTimezone(opt.id)}
+              title={`${opt.label} (${opt.short})`}
+            >
+              {opt.label}
+            </button>
+          {/each}
+        </div>
+        <button
+          type="button"
+          class="search-toggle"
+          class:active={searchOpen || searching}
+          on:click={toggleSearch}
+          aria-label="Cari boss"
+          aria-expanded={searchOpen}
+          title="Cari boss"
+        >
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
       </div>
       {#if ENABLE_MARK_KILLED}
         <div class="auth-box">
@@ -545,6 +575,24 @@
         <div class="clock-date">{formatDateInZone(now, displayTimeZone)}</div>
       </div>
     </div>
+    {#if searchOpen}
+      <div class="header-search">
+        <input
+          type="search"
+          class="search-input"
+          placeholder="Cari boss by nama..."
+          bind:value={searchQuery}
+          bind:this={searchInputEl}
+          autocomplete="off"
+          spellcheck="false"
+          on:keydown={(e) => e.key === 'Escape' && (searchOpen = false)}
+        />
+        {#if searching}
+          <span class="search-meta">{searchHitCount} hasil</span>
+          <button type="button" class="search-clear" on:click={clearSearch}>Hapus</button>
+        {/if}
+      </div>
+    {/if}
   </header>
 
   {#if killError}
@@ -618,21 +666,6 @@
       </button>
     </div>
   {/if}
-
-  <div class="search-bar">
-    <input
-      type="search"
-      class="search-input"
-      placeholder="Cari boss by nama..."
-      bind:value={searchQuery}
-      autocomplete="off"
-      spellcheck="false"
-    />
-    {#if searching}
-      <span class="search-meta">{searchHitCount} hasil</span>
-      <button type="button" class="search-clear" on:click={() => (searchQuery = '')}>Hapus</button>
-    {/if}
-  </div>
 
   {#if searching && searchHitCount === 0}
     <p class="empty-hint search-empty">Tidak ada boss bernama “{searchQuery.trim()}”.</p>
@@ -753,10 +786,9 @@
   }
 
   header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    flex-wrap: wrap;
     gap: 10px;
     margin-bottom: 14px;
     padding-bottom: 12px;
@@ -848,6 +880,46 @@
     align-items: center;
     gap: 14px;
     flex-wrap: wrap;
+  }
+  .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .search-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid #2a2a38;
+    color: #8a8aa0;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .search-toggle:hover {
+    color: #d8d8e6;
+    border-color: #4a4a68;
+  }
+  .search-toggle.active {
+    color: #f0b428;
+    border-color: rgba(240, 180, 40, 0.45);
+    background: rgba(240, 180, 40, 0.12);
+  }
+  .search-icon {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+  .header-search {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 2px;
   }
   .tz-switch {
     display: inline-flex;
@@ -1055,12 +1127,6 @@
     border: 1px dashed #2a2a38;
   }
 
-  .search-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
   .search-input {
     flex: 1;
     min-width: 0;
