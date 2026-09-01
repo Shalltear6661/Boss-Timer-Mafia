@@ -649,50 +649,52 @@
         {/if}
       </p>
     {:else}
-      {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
-        {@const turnKey = 'field:' + turnLabel}
-        {@const minimized = turnMinimized[turnKey] !== false}
-        {@const shownBosses =
-          !minimized || turnBosses.length <= minimizedBossCount
-            ? turnBosses
-            : turnBosses.slice(0, minimizedBossCount)}
-        <div
-          class="turn-panel"
-          class:mafia={turnLabel === 'MAFIA'}
-          class:mafiax2={turnLabel === 'MAFIAx2'}
-          class:noturn={turnLabel === 'Tanpa Turn'}
-          class:minimized
-        >
-          <h3 class="turn-label">
-            <span class="turn-dot"></span>
-            {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : turnLabel}
-            <span class="turn-count">{turnBosses.length}</span>
-            {#if turnBosses.length > minimizedBossCount}
-              <button
-                type="button"
-                class="turn-toggle"
-                aria-expanded={!minimized}
-                on:click={() => toggleTurnMinimized(turnKey)}
-              >
-                {minimized ? `Semua (${turnBosses.length})` : 'Minimize'}
-              </button>
-            {/if}
-          </h3>
-          <div class="card-grid">
-            {#each shownBosses as boss (boss.id)}
-              <BossCard
-                {boss}
-                {now}
-                timeZone={displayTimeZone}
-                {tzLabel}
-                onMarkKilled={canEdit ? (boss) => openKillForm(boss) : null}
-                killing={killingId === boss.id}
-                showKill={canEdit}
-              />
-            {/each}
+      <div class="turn-grid">
+        {#each bossesByTurn as [turnLabel, turnBosses] (turnLabel)}
+          {@const turnKey = 'field:' + turnLabel}
+          {@const minimized = turnMinimized[turnKey] !== false}
+          {@const shownBosses =
+            !minimized || turnBosses.length <= minimizedBossCount
+              ? turnBosses
+              : turnBosses.slice(0, minimizedBossCount)}
+          <div
+            class="turn-panel"
+            class:mafia={turnLabel === 'MAFIA'}
+            class:mafiax2={turnLabel === 'MAFIAx2'}
+            class:noturn={turnLabel === 'Tanpa Turn'}
+            class:minimized
+          >
+            <h3 class="turn-label">
+              <span class="turn-dot"></span>
+              {turnLabel === 'Tanpa Turn' ? 'Tanpa Turn' : turnLabel}
+              <span class="turn-count">{turnBosses.length}</span>
+              {#if turnBosses.length > minimizedBossCount}
+                <button
+                  type="button"
+                  class="turn-toggle"
+                  aria-expanded={!minimized}
+                  on:click={() => toggleTurnMinimized(turnKey)}
+                >
+                  {minimized ? `Semua (${turnBosses.length})` : 'Minimize'}
+                </button>
+              {/if}
+            </h3>
+            <div class="card-grid turn-cards">
+              {#each shownBosses as boss (boss.id)}
+                <BossCard
+                  {boss}
+                  {now}
+                  timeZone={displayTimeZone}
+                  {tzLabel}
+                  onMarkKilled={canEdit ? (boss) => openKillForm(boss) : null}
+                  killing={killingId === boss.id}
+                  showKill={canEdit}
+                />
+              {/each}
+            </div>
           </div>
-        </div>
-      {/each}
+        {/each}
+      </div>
     {/if}
   </section>
 
@@ -1107,15 +1109,25 @@
     margin: 0 0 8px;
   }
 
+  .turn-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
   .turn-panel {
-    margin-bottom: 10px;
+    margin-bottom: 0;
     padding: 8px 10px 10px;
     border-radius: 10px;
     border: 1px solid #2a2a38;
     background: #14141e;
+    min-width: 0;
   }
-  .turn-panel:last-child {
-    margin-bottom: 0;
+  .turn-panel.noturn {
+    grid-column: 1 / -1;
+    border-color: rgba(148, 163, 184, 0.35);
+    background: linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(20, 20, 30, 0.95) 55%);
+    box-shadow: inset 3px 0 0 #94a3b8;
   }
   .turn-panel.mafia {
     border-color: rgba(59, 130, 246, 0.45);
@@ -1126,11 +1138,6 @@
     border-color: rgba(168, 85, 247, 0.5);
     background: linear-gradient(135deg, rgba(147, 51, 234, 0.2) 0%, rgba(20, 20, 30, 0.95) 55%);
     box-shadow: inset 3px 0 0 #a855f7;
-  }
-  .turn-panel.noturn {
-    border-color: rgba(148, 163, 184, 0.35);
-    background: linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(20, 20, 30, 0.95) 55%);
-    box-shadow: inset 3px 0 0 #94a3b8;
   }
   .turn-label {
     display: flex;
@@ -1208,8 +1215,18 @@
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 8px;
   }
+  .turn-cards {
+    grid-template-columns: 1fr;
+  }
   .weekly-turn-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 700px) {
+    .turn-grid,
+    .weekly-turn-grid {
+      grid-template-columns: 1fr;
+    }
   }
 
   footer {
