@@ -492,33 +492,35 @@
     <div class="header-meta">
       <div class="header-tools">
         <img class="brand-mark brand-mark--mobile" src="/3551739.jpg" alt="Mafia Timer" width="40" height="40" />
-        <div class="tz-switch" role="group" aria-label="Zona waktu">
-          {#each TIMEZONE_OPTIONS as opt (opt.id)}
-            <button
-              type="button"
-              class="tz-btn"
-              class:active={tzId === opt.id}
-              on:click={() => setTimezone(opt.id)}
-              title={`${opt.label} (${opt.short})`}
-            >
-              {opt.label}
-            </button>
-          {/each}
+        <div class="header-tools-actions">
+          <div class="tz-switch" role="group" aria-label="Zona waktu">
+            {#each TIMEZONE_OPTIONS as opt (opt.id)}
+              <button
+                type="button"
+                class="tz-btn"
+                class:active={tzId === opt.id}
+                on:click={() => setTimezone(opt.id)}
+                title={`${opt.label} (${opt.short})`}
+              >
+                {opt.label}
+              </button>
+            {/each}
+          </div>
+          <button
+            type="button"
+            class="search-toggle"
+            class:active={searchOpen || searching}
+            on:click={toggleSearch}
+            aria-label="Cari boss"
+            aria-expanded={searchOpen}
+            title="Cari boss"
+          >
+            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </button>
         </div>
-        <button
-          type="button"
-          class="search-toggle"
-          class:active={searchOpen || searching}
-          on:click={toggleSearch}
-          aria-label="Cari boss"
-          aria-expanded={searchOpen}
-          title="Cari boss"
-        >
-          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
-            <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
-        </button>
       </div>
       {#if ENABLE_MARK_KILLED}
         <div class="auth-box">
@@ -855,6 +857,11 @@
     flex-wrap: wrap;
   }
   .header-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .header-tools-actions {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1479,8 +1486,10 @@
       gap: 10px;
     }
     .header-tools {
-      justify-content: center;
+      justify-content: space-between;
+      align-items: center;
       width: 100%;
+      gap: 8px;
     }
     .auth-box {
       justify-content: center;
