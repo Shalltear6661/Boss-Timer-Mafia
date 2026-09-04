@@ -6,8 +6,7 @@
 const TURNS = ['MAFIA', 'MAFIAx2']
 
 async function fetchRange(range, turn) {
-  const t = Date.now()
-  const res = await fetch(`/api/sheets?range=${encodeURIComponent(range)}&turn=${encodeURIComponent(turn)}&_=${t}`)
+  const res = await fetch(`/api/sheets?range=${encodeURIComponent(range)}&turn=${encodeURIComponent(turn)}`)
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Gagal fetch sheet: ${res.status}`)

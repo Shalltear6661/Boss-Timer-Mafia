@@ -9,7 +9,7 @@
 import { fetchSheetValues } from '../server/sheets.js'
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+  res.setHeader('Cache-Control', 's-maxage=20, stale-while-revalidate=40')
   res.setHeader('Content-Type', 'application/json')
 
   if (req.method !== 'GET') {

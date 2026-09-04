@@ -6,6 +6,7 @@
  * - MAFIAx2 → sheet Boss Timer M2
  *
  * Baca sheet prioritas: Service Account (bisa akses private) → fallback API Key.
+ * Ada cache singkat agar tidak kena quota Read requests per minute.
  */
 
 import { getAccessToken } from './googleAuth.js'
@@ -24,11 +25,80 @@ const DEFAULT_SHEETS = {
 
 const TURN_SHEETS = ['MAFIA', 'MAFIAx2']
 
+/** Cache baca sheet (per instance serverless) — kurangi quota Google */
+const CACHE_TTL_MS = 25_000
+const valuesCache = new Map()
+/** Map nama boss → nomor baris sheet (1-based) dari baca terakhir */
+const rowIndexCache = new Map()
+
 function normalizeTurn(turn) {
   const t = String(turn || '').trim().toLowerCase()
   if (t === 'mafia') return 'MAFIA'
   if (t === 'mafiax2' || t === 'mafia x2' || t === 'mafia-x2') return 'MAFIAx2'
   return ''
+}
+
+function cacheKey(spreadsheetId, sheetName, range) {
+  return `${spreadsheetId}|${sheetName}|${range}`
+}
+
+function rowIndexKey(spreadsheetId, sheetName) {
+  return `${spreadsheetId}|${sheetName}`
+}
+
+function getCachedValues(key) {
+  const hit = valuesCache.get(key)
+  if (!hit) return null
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    valuesCache.delete(key)
+    return null
+  }
+  return hit.values
+}
+
+function setCachedValues(key, values) {
+  valuesCache.set(key, { at: Date.now(), values })
+}
+
+/** Update index nama→baris dari hasil baca kolom A (A2:…) */
+function updateRowIndexFromValues(spreadsheetId, sheetName, range, values) {
+  if (!/^A2(:|$)/i.test(String(range || ''))) return
+  const map = new Map()
+  for (let i = 0; i < (values || []).length; i++) {
+    const cell = String(values[i]?.[0] || '').trim()
+    if (!cell) continue
+    if (cell === 'Boss Name') {
+      if (i > 0) break
+      continue
+    }
+    map.set(cell.toLowerCase(), i + 2)
+  }
+  rowIndexCache.set(rowIndexKey(spreadsheetId, sheetName), { at: Date.now(), map })
+}
+
+/** Cari nomor baris boss dari cache (tanpa hit Google). Null jika miss/expired. */
+export function lookupBossRow(bossName, turn = '', env = process.env) {
+  const { spreadsheetId, sheetName } = getSheetsConfig(turn, env)
+  const hit = rowIndexCache.get(rowIndexKey(spreadsheetId, sheetName))
+  if (!hit || Date.now() - hit.at > CACHE_TTL_MS * 4) return null
+  const row = hit.map.get(String(bossName || '').trim().toLowerCase())
+  return row || null
+}
+
+/** Invalidate cache setelah write / kill */
+export function invalidateSheetsCache(turn = '') {
+  const turnKey = normalizeTurn(turn)
+  if (!turnKey) {
+    valuesCache.clear()
+    rowIndexCache.clear()
+    return
+  }
+  const cfg = getSheetsConfig(turnKey)
+  const prefix = `${cfg.spreadsheetId}|${cfg.sheetName}|`
+  for (const key of [...valuesCache.keys()]) {
+    if (key.startsWith(prefix)) valuesCache.delete(key)
+  }
+  rowIndexCache.delete(rowIndexKey(cfg.spreadsheetId, cfg.sheetName))
 }
 
 /** Ambil config sheet berdasarkan turn. */
@@ -64,11 +134,7 @@ export function getAllSheetConfigs(env = process.env) {
   }))
 }
 
-/**
- * Fetch values dari sheet tertentu.
- * Prioritas auth: Service Account → API Key (untuk sheet private).
- */
-export async function fetchSheetValues(range, turn = '', env = process.env) {
+async function fetchSheetValuesUncached(range, turn, env) {
   const { apiKey, spreadsheetId, sheetName } = getSheetsConfig(turn, env)
   if (!range || !/^[A-Z0-9:]+$/i.test(range)) {
     throw new Error('Range tidak valid')
@@ -87,17 +153,15 @@ export async function fetchSheetValues(range, turn = '', env = process.env) {
     })
     if (res.ok) {
       const data = await res.json()
-      return data.values || []
+      return { values: data.values || [], spreadsheetId, sheetName }
     }
     const text = await res.text().catch(() => '')
-    // Jika SA gagal, coba API key (jangan throw dulu)
     if (!apiKey) {
       throw new Error(`Google Sheets error ${res.status}: ${text.slice(0, 200)}`)
     }
     console.warn(`[sheets] SA read gagal (${res.status}) untuk ${sheetName}, coba API key`)
   } catch (e) {
     if (!apiKey) throw e
-    // SA belum dikonfigurasi / gagal — lanjut API key
     if (e?.code !== 'MISSING_WRITE_CREDS' && e?.code !== 'MISSING_SA') {
       console.warn(`[sheets] SA unavailable: ${e.message}`)
     }
@@ -115,5 +179,25 @@ export async function fetchSheetValues(range, turn = '', env = process.env) {
     )
   }
   const data = await res.json()
-  return data.values || []
+  return { values: data.values || [], spreadsheetId, sheetName }
+}
+
+/**
+ * Fetch values dari sheet tertentu.
+ * Prioritas auth: Service Account → API Key (untuk sheet private).
+ * skipCache=true untuk baca paksa (jarang dipakai).
+ */
+export async function fetchSheetValues(range, turn = '', env = process.env, { skipCache = false } = {}) {
+  const { spreadsheetId, sheetName } = getSheetsConfig(turn, env)
+  const key = cacheKey(spreadsheetId, sheetName, range)
+
+  if (!skipCache) {
+    const cached = getCachedValues(key)
+    if (cached) return cached
+  }
+
+  const { values } = await fetchSheetValuesUncached(range, turn, env)
+  setCachedValues(key, values)
+  updateRowIndexFromValues(spreadsheetId, sheetName, range, values)
+  return values
 }

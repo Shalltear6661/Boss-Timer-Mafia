@@ -95,7 +95,11 @@
         b.id === boss.id ? { ...b, lastDeath: deathDate } : b
       )
       persist()
-      await syncFromSpreadsheet()
+      // Jangan sync penuh langsung — hemat quota Sheets (1 kill + 4 baca = mudah kena limit).
+      // UI sudah di-update lokal; sync ringan setelah jeda singkat.
+      setTimeout(() => {
+        syncFromSpreadsheet().catch(() => {})
+      }, 20_000)
       killTarget = null // sukses → tutup modal
     } catch (e) {
       console.error(e)
@@ -225,14 +229,17 @@
 
   // Ambil data terbaru dari Google Spreadsheet.
   // Kill di web akan menulis Time of Death ke spreadsheet (OAuth akun pribadi).
+  let weeklySyncTick = 0
   async function syncFromSpreadsheet() {
     if (syncing) return
     syncing = true
     try {
-      const [fetchedBosses, fetchedWeekly] = await Promise.all([
-        fetchIntervalBosses(),
-        fetchWeeklyBosses(),
-      ])
+      // Weekly jarang berubah — sync tiap ~5 menit (5 × interval 60s), hemat quota baca.
+      weeklySyncTick += 1
+      const shouldSyncWeekly = weeklySyncTick === 1 || weeklySyncTick % 5 === 0
+
+      const fetchedBosses = await fetchIntervalBosses()
+      const fetchedWeekly = shouldSyncWeekly ? await fetchWeeklyBosses() : []
 
       if (fetchedBosses.length > 0) {
         bosses = fetchedBosses.map((b) => ({ ...b, lastDeath: new Date(b.lastDeath) }))
@@ -288,7 +295,9 @@
         b.id === boss.id ? { ...b, lastDeath: deathDate || new Date() } : b
       )
       persist()
-      await syncFromSpreadsheet()
+      setTimeout(() => {
+        syncFromSpreadsheet().catch(() => {})
+      }, 20_000)
     } catch (e) {
       console.error(e)
       killError = e.message || 'Gagal menyimpan ke spreadsheet'

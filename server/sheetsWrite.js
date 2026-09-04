@@ -1,5 +1,5 @@
 import { getAccessToken } from './googleAuth.js'
-import { getSheetsConfig } from './sheets.js'
+import { getSheetsConfig, lookupBossRow, invalidateSheetsCache, fetchSheetValues } from './sheets.js'
 
 /** Format waktu kematian sesuai spreadsheet: DD/MM/YYYY H:mm (WIB) */
 export function formatDeathForSheet(date = new Date()) {
@@ -21,6 +21,7 @@ export function formatDeathForSheet(date = new Date()) {
 /**
  * Update kolom Time of Death (D) untuk boss interval.
  * Parameter turn menentukan sheet tujuan (MAFIA / MAFIAx2).
+ * Menghindari baca ulang jika nomor baris masih ada di cache.
  * @returns {{ row: number, deathTime: string, name: string }}
  */
 export async function markBossKilledOnSheet(bossName, env = process.env, deathDate = new Date(), turn = '') {
@@ -31,42 +32,33 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
   const accessToken = await getAccessToken(env)
   const deathTime = formatDeathForSheet(deathDate)
 
+  let sheetRow = lookupBossRow(name, turn, env)
+
+  // Hanya baca Google jika cache baris kosong / expired
+  if (!sheetRow) {
+    const rows = await fetchSheetValues('A2:A', turn, env, { skipCache: false })
+    let rowIndex = -1
+    for (let i = 0; i < rows.length; i++) {
+      const cell = (rows[i][0] || '').trim()
+      if (!cell) continue
+      if (cell === 'Boss Name') {
+        if (i > 0) break
+        continue
+      }
+      if (cell.toLowerCase() === name.toLowerCase()) {
+        rowIndex = i
+        break
+      }
+    }
+    if (rowIndex < 0) {
+      throw new Error(
+        `Boss "${name}" tidak ditemukan di sheet ${sheetName} (turn: ${resolvedTurn || turn || 'default'})`
+      )
+    }
+    sheetRow = rowIndex + 2
+  }
+
   const safeSheet = String(sheetName).replace(/'/g, "''")
-  const readRange = `'${safeSheet}'!A2:A`
-  const readUrl =
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(readRange)}`
-
-  const readRes = await fetch(readUrl, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-  const readData = await readRes.json().catch(() => ({}))
-  if (!readRes.ok) {
-    throw new Error(readData.error?.message || `Gagal baca sheet (${readRes.status})`)
-  }
-
-  const rows = readData.values || []
-  let rowIndex = -1
-  for (let i = 0; i < rows.length; i++) {
-    const cell = (rows[i][0] || '').trim()
-    if (!cell) continue
-    // Header kedua = mulai section weekly — stop
-    if (cell === 'Boss Name') {
-      if (i > 0) break
-      continue
-    }
-    if (cell.toLowerCase() === name.toLowerCase()) {
-      rowIndex = i
-      break
-    }
-  }
-  if (rowIndex < 0) {
-    throw new Error(
-      `Boss "${name}" tidak ditemukan di sheet ${sheetName} (turn: ${resolvedTurn || turn || 'default'})`
-    )
-  }
-
-  const sheetRow = rowIndex + 2
   const writeRange = `'${safeSheet}'!D${sheetRow}`
   const writeUrl =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
@@ -85,10 +77,13 @@ export async function markBossKilledOnSheet(bossName, env = process.env, deathDa
     throw new Error(writeData.error?.message || `Gagal update sheet (${writeRes.status})`)
   }
 
+  // Data sheet berubah — bersihkan cache turn terkait
+  invalidateSheetsCache(resolvedTurn || turn)
+
   return {
     row: sheetRow,
     deathTime,
-    name: rows[rowIndex][0].trim(),
+    name,
     turn: resolvedTurn || turn || '',
     sheetName,
     spreadsheetId,
