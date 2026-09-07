@@ -168,6 +168,21 @@ function logDistStatus() {
 
 logDistStatus()
 
+if (!existsSync(join(DIST, 'index.html'))) {
+  console.error('[server] FATAL: dist/index.html tidak ada. Jalankan: npm run build')
+  process.exit(1)
+}
+try {
+  const assets = readdirSync(join(DIST, 'assets')).filter((f) => f.endsWith('.js'))
+  if (assets.length === 0) {
+    console.error('[server] FATAL: dist/assets/*.js kosong. Jalankan: npm run build')
+    process.exit(1)
+  }
+} catch {
+  console.error('[server] FATAL: folder dist/assets tidak ada. Jalankan: npm run build')
+  process.exit(1)
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     const host = req.headers.host || 'localhost'

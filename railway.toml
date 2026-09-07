@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-# Pastikan Vite ter-install meski NODE_ENV=production
 buildCommand = "npm install --include=dev && npm run build"
 
 [deploy]
-startCommand = "npm start"
+# Build ulang saat start agar dist/assets pasti ada (hindari index.html orphan tanpa assets)
+startCommand = "npm run build && node server.mjs"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
