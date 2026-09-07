@@ -16,12 +16,10 @@
     "sa:test": "node scripts/sa-test.mjs",
     "generate:vapid": "node scripts/generate-vapid.mjs"
   },
-  "devDependencies": {
+  "dependencies": {
     "@sveltejs/vite-plugin-svelte": "^3.1.1",
     "svelte": "^4.2.18",
-    "vite": "^5.3.1"
-  },
-  "dependencies": {
+    "vite": "^5.3.1",
     "web-push": "^3.6.7"
   }
 }

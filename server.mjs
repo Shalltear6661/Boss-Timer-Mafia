@@ -3,9 +3,9 @@
  * Melayani static build (dist/) + API handlers di /api/*.
  */
 import http from 'node:http'
-import { createReadStream, existsSync, readFileSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, readdirSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { dirname, extname, join, normalize } from 'node:path'
+import { dirname, extname, join, normalize, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import auth from './api/auth.js'
@@ -46,6 +46,7 @@ loadEnvFile()
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
@@ -53,12 +54,15 @@ const MIME = {
   '.webp': 'image/webp',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.mp3': 'audio/mpeg',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',
   '.map': 'application/json',
 }
+
+const ASSET_EXTS = new Set(Object.keys(MIME).filter((e) => e !== '.html'))
 
 const routes = [
   [/^\/api\/auth\/?$/, auth],
@@ -70,45 +74,99 @@ const routes = [
   [/^\/api\/cron-push\/?$/, cronPush],
 ]
 
+function isInsideDist(resolved) {
+  const rel = relative(DIST, resolved)
+  return rel === '' || (!rel.startsWith('..') && !rel.includes(`..${sep}`))
+}
+
 function safeDistPath(pathname) {
-  const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\//, '')
+  const decoded = decodeURIComponent(pathname.split('?')[0])
+  const rel = decoded === '/' ? 'index.html' : decoded.replace(/^\/+/, '')
   const resolved = normalize(join(DIST, rel))
-  if (!resolved.startsWith(DIST)) return null
+  if (!isInsideDist(resolved)) return null
   return resolved
 }
 
+function sendFile(res, filePath) {
+  const ext = extname(filePath).toLowerCase()
+  res.statusCode = 200
+  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream')
+  if (ext === '.html') {
+    res.setHeader('Cache-Control', 'no-cache')
+  } else if (ASSET_EXTS.has(ext)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  }
+  createReadStream(filePath)
+    .on('error', (err) => {
+      console.error('[static]', err.message)
+      if (!res.headersSent) {
+        res.statusCode = 500
+        res.end('Read error')
+      } else {
+        res.destroy()
+      }
+    })
+    .pipe(res)
+}
+
 async function serveStatic(req, res, pathname) {
-  let filePath = safeDistPath(pathname)
+  const filePath = safeDistPath(pathname)
   if (!filePath) {
     res.statusCode = 403
     res.end('Forbidden')
     return
   }
 
+  const ext = extname(pathname).toLowerCase()
+  const looksLikeAsset = ASSET_EXTS.has(ext) || pathname.startsWith('/assets/')
+
   try {
-    let s = await stat(filePath)
+    const s = await stat(filePath)
     if (s.isDirectory()) {
-      filePath = join(filePath, 'index.html')
-      s = await stat(filePath)
+      const indexPath = join(filePath, 'index.html')
+      await stat(indexPath)
+      sendFile(res, indexPath)
+      return
     }
+    sendFile(res, filePath)
   } catch {
-    // SPA fallback untuk client-side routes
-    filePath = join(DIST, 'index.html')
+    // Jangan fallback HTML untuk .js/.css — itu penyebab MIME error di browser
+    if (looksLikeAsset) {
+      res.statusCode = 404
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+      res.end(`Asset not found: ${pathname}`)
+      return
+    }
+
+    const spa = join(DIST, 'index.html')
     try {
-      await stat(filePath)
+      await stat(spa)
+      sendFile(res, spa)
     } catch {
       res.statusCode = 404
       res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-      res.end('Not found — jalankan npm run build terlebih dahulu')
-      return
+      res.end('Not found — dist/ kosong. Pastikan build berhasil (npm run build).')
     }
   }
-
-  const ext = extname(filePath)
-  res.statusCode = 200
-  res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream')
-  createReadStream(filePath).pipe(res)
 }
+
+function logDistStatus() {
+  const indexOk = existsSync(join(DIST, 'index.html'))
+  const assetsDir = join(DIST, 'assets')
+  let assetCount = 0
+  try {
+    assetCount = readdirSync(assetsDir).length
+  } catch {
+    assetCount = 0
+  }
+  console.log(`[server] DIST=${DIST}`)
+  console.log(`[server] index.html=${indexOk ? 'ok' : 'MISSING'} assets=${assetCount}`)
+  if (!indexOk) {
+    console.error('[server] WARNING: dist/index.html tidak ada. Railway harus menjalankan npm run build sebelum start.')
+  }
+}
+
+logDistStatus()
 
 const server = http.createServer(async (req, res) => {
   try {

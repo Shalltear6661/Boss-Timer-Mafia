@@ -1,6 +1,7 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build"
+# Pastikan Vite ter-install meski NODE_ENV=production
+buildCommand = "npm install --include=dev && npm run build"
 
 [deploy]
 startCommand = "npm start"
