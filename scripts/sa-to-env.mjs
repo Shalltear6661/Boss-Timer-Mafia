@@ -1,5 +1,5 @@
 /**
- * Baca file JSON Service Account → cetak baris untuk .env / Vercel.
+ * Baca file JSON Service Account → cetak baris untuk .env / Railway Variables.
  * Usage: node scripts/sa-to-env.mjs ./path/ke/key.json
  */
 import { readFileSync } from 'node:fs'
@@ -27,4 +27,4 @@ console.log('\n=== Atau satu variabel JSON ===\n')
 console.log(`GOOGLE_SERVICE_ACCOUNT_JSON=${JSON.stringify(json)}`)
 console.log('\n=== Lalu ===')
 console.log(`1. Share spreadsheet ke: ${json.client_email} (Editor)`)
-console.log('2. Restart npm run dev / Redeploy Vercel\n')
+console.log('2. Restart npm run dev / Redeploy Railway\n')

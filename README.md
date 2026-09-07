@@ -38,18 +38,28 @@ Tidak perlu `npm run auth:google`.
 ### 3. Login Google (role Editor / view-only)
 
 1. Buat OAuth Client **Web application**
-   - Authorized JavaScript origins: `http://localhost:5173`, `https://YOUR.vercel.app`
+   - Authorized JavaScript origins: `http://localhost:5173`, `https://YOUR.up.railway.app`
 2. Isi `GOOGLE_OAUTH_CLIENT_ID` (+ secret opsional untuk server)
 3. Consent screen → **Test users** → email yang akan login
 4. Set `EDITOR_EMAILS=emailanda@gmail.com`
 
-### 4. Jalankan
+### 4. Jalankan lokal
 
 ```bash
 npm run dev
 ```
 
-### 5. Vercel env
+Produksi lokal (setelah build):
+
+```bash
+npm run build
+npm start
+```
+
+### 5. Deploy ke Railway
+
+1. Buat project baru di [Railway](https://railway.app) → **Deploy from GitHub** (atau CLI)
+2. Tambahkan **Variables** (sama seperti `.env`):
 
 Wajib:
 
@@ -58,4 +68,10 @@ Wajib:
 - `GOOGLE_OAUTH_CLIENT_ID`
 - `EDITOR_EMAILS`, `SESSION_SECRET`
 
-Lalu **Redeploy**.
+Opsional (Web Push):
+
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_CONTACT_EMAIL`, `CRON_SECRET`
+
+3. Build/start sudah di `railway.toml` (`npm run build` → `npm start`)
+4. Setelah dapat URL publik, update **Google OAuth** Authorized JavaScript origins ke URL Railway tersebut
+5. Redeploy jika mengubah Variables

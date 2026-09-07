@@ -1,5 +1,4 @@
 /**
- * Vercel Serverless Function
  * GET /api/sheets?range=A2:H&turn=MAFIA
  *
  * Multi-sheet: parameter ?turn=MAFIA / MAFIAx2 untuk routing ke sheet berbeda.
@@ -45,7 +44,7 @@ export default async function handler(req, res) {
         error: e?.message || 'Gagal fetch spreadsheet',
         hint:
           e?.code === 'MISSING_ENV'
-            ? 'Vercel → Settings → Environment Variables → pastikan nama persis GOOGLE_SHEETS_API_KEY, centang Production (+ Preview), lalu Redeploy (Deployments → … → Redeploy).'
+            ? 'Railway → Variables → pastikan nama persis GOOGLE_SHEETS_API_KEY, lalu Redeploy.'
             : undefined,
       })
     )

@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         error: e?.message || 'Gagal update spreadsheet',
         hint:
           e?.code === 'MISSING_WRITE_CREDS' || e?.code === 'MISSING_SA'
-            ? 'Set Service Account di Vercel + share spreadsheet ke email SA (Editor)'
+            ? 'Set Service Account di Railway Variables + share spreadsheet ke email SA (Editor)'
             : e?.code === 'SA_TOKEN_FAILED'
               ? 'Cek private key SA / pastikan Google Sheets API enabled'
               : undefined,

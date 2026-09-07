@@ -29,7 +29,7 @@ function normalizePrivateKey(raw) {
   ) {
     key = key.slice(1, -1).trim()
   }
-  // Literal \n → newline (Vercel / .env satu baris)
+  // Literal \n → newline (Railway Variables / .env satu baris)
   key = key.replace(/\\n/g, '\n')
   // Rapikan spasi aneh di sekitar header PEM
   key = key.replace(/\r\n/g, '\n')

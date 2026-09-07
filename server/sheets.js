@@ -1,5 +1,5 @@
 /**
- * Shared Google Sheets fetch — dipakai Vite (dev) & Vercel (production).
+ * Shared Google Sheets fetch — dipakai Vite (dev) & server.mjs (production).
  *
  * Multi-sheet berdasarkan turn:
  * - MAFIA → sheet Boss Timer M1
@@ -11,7 +11,7 @@
 
 import { getAccessToken } from './googleAuth.js'
 
-/** Default hardcode — dipakai jika env turn-specific belum di-set di Vercel */
+/** Default hardcode — dipakai jika env turn-specific belum di-set */
 const DEFAULT_SHEETS = {
   MAFIA: {
     spreadsheetId: '16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI',

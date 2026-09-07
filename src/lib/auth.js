@@ -6,7 +6,7 @@ export async function getAuthConfig() {
   if (embeddedClientId) {
     return { clientId: embeddedClientId }
   }
-  // Fallback: dari API server (Vercel runtime / proxy)
+  // Fallback: dari API server (production / Vite proxy)
   const res = await fetch('/api/auth?action=config')
   if (!res.ok) throw new Error('Gagal load auth config')
   const data = await res.json()

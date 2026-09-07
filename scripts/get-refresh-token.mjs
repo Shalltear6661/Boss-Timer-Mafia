@@ -101,7 +101,7 @@ async function exchangeCode(code) {
 }
 
 function finish(tokens) {
-  console.log('\n=== SALIN KE .env DAN VERCEL ===\n')
+  console.log('\n=== SALIN KE .env DAN RAILWAY ===\n')
   console.log(`GOOGLE_OAUTH_REFRESH_TOKEN=${tokens.refresh_token || ''}`)
   console.log('\n================================\n')
   if (!tokens.refresh_token) {

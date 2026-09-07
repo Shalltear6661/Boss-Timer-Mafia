@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     res.end(
       JSON.stringify({
         error: 'VAPID_PUBLIC_KEY belum di-set',
-        hint: 'Jalankan: node scripts/generate-vapid.mjs lalu isi .env / Vercel',
+        hint: 'Jalankan: node scripts/generate-vapid.mjs lalu isi .env / Railway Variables',
       })
     )
     return

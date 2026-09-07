@@ -341,7 +341,7 @@
         }
       } else {
         authError =
-          'GOOGLE_OAUTH_CLIENT_ID belum di-set di .env / Vercel (atau server belum di-restart/redeploy)'
+          'GOOGLE_OAUTH_CLIENT_ID belum di-set di .env / Railway (atau server belum di-restart/redeploy)'
       }
     } catch (e) {
       console.warn('Auth init:', e)
