@@ -23,16 +23,20 @@
   }
 
   function formatClock(date, zone, label) {
-    return (
-      new Date(date).toLocaleTimeString('id-ID', {
-        timeZone: zone,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }) +
-      ' ' +
-      label
-    )
+    const d = new Date(date)
+    const datePart = d.toLocaleDateString('id-ID', {
+      timeZone: zone,
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+    const timePart = d.toLocaleTimeString('id-ID', {
+      timeZone: zone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    return `${datePart}, ${timePart} ${label}`
   }
 </script>
 
@@ -146,9 +150,7 @@
     min-width: 0;
     font-size: 13px;
     color: #8a8aa0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.35;
   }
   .status {
     font-size: 11px;

@@ -20,16 +20,20 @@
   }
 
   function formatClock(date, zone, label) {
-    return (
-      new Date(date).toLocaleTimeString('id-ID', {
-        timeZone: zone,
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }) +
-      ' ' +
-      label
-    )
+    const d = new Date(date)
+    const datePart = d.toLocaleDateString('id-ID', {
+      timeZone: zone,
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+    const timePart = d.toLocaleTimeString('id-ID', {
+      timeZone: zone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    return `${datePart}, ${timePart} ${label}`
   }
 
   $: rows = bosses
