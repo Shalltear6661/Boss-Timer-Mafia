@@ -446,11 +446,19 @@
     const watchList = [
       ...sortedBosses.map((b) => {
         const nextSpawn = b.lastDeath.getTime() + b.spawnIntervalHours * 3600 * 1000
-        return { id: 'ib-' + b.id, name: b.name, msLeft: nextSpawn - now.getTime() }
+        return {
+          id: `ib-${b.turn || 'MAFIA'}-${b.id}`,
+          name: b.name,
+          msLeft: nextSpawn - now.getTime(),
+        }
       }),
       ...sortedWeeklyBosses.map((b) => {
         const nextSpawn = nextSpawnFor(b, now)
-        return { id: 'wb-' + b.id, name: b.name, msLeft: nextSpawn.getTime() - now.getTime() }
+        return {
+          id: `wb-${b.turn || 'MAFIA'}-${b.id}`,
+          name: b.name,
+          msLeft: nextSpawn.getTime() - now.getTime(),
+        }
       }),
     ]
     checkAndNotify(watchList)

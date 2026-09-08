@@ -189,6 +189,36 @@ function alreadyFired(bossId, milestone) {
   return notified.get(bossId)?.has(milestone) ?? false
 }
 
+/** Claim sekali per milestone — aman multi-tab via localStorage + BroadcastChannel */
+function tryClaimFire(bossId, milestone) {
+  loadNotified()
+  if (alreadyFired(bossId, milestone)) return false
+  markFired(bossId, milestone)
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('boss-timer-notif')
+      bc.postMessage({ type: 'fired', bossId, milestone })
+      bc.close()
+    }
+  } catch {
+    /* ignore */
+  }
+  return true
+}
+
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    const bc = new BroadcastChannel('boss-timer-notif')
+    bc.onmessage = (event) => {
+      if (event.data?.type === 'fired' && event.data.bossId && event.data.milestone) {
+        markFired(event.data.bossId, event.data.milestone)
+      }
+    }
+  }
+} catch {
+  /* ignore */
+}
+
 /** Reset milestone tracking jika boss jauh dari window (cycle baru) */
 export function resetIfFar(bossId, msLeft) {
   if (msLeft > 12 * 60 * 1000) {
@@ -230,9 +260,7 @@ export function checkAndNotify(items) {
     resetIfFar(item.id, item.msLeft)
 
     for (const m of MILESTONES) {
-      if (m.match(item.msLeft) && !alreadyFired(item.id, m.id)) {
-        markFired(item.id, m.id)
-
+      if (m.match(item.msLeft) && tryClaimFire(item.id, m.id)) {
         // Coba suara custom; jika gagal, biarkan notifikasi OS bunyi (silent: false)
         playAlertSound().then((played) => {
           if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
@@ -240,9 +268,9 @@ export function checkAndNotify(items) {
             new Notification(m.title, {
               body: m.body(item.name),
               tag: `boss-${item.id}-${m.id}`,
-              renotify: true,
+              renotify: false,
               icon: '/3551739.jpg',
-              silent: played, // true = custom sudah bunyi; false = pakai suara OS
+              silent: played,
             })
           } catch (e) {
             console.warn('Gagal kirim notifikasi:', e)

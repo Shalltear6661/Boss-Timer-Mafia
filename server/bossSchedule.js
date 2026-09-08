@@ -133,6 +133,7 @@ function nextOccurrence(schedule, now) {
 async function loadIntervalBosses(config, now, env) {
   const rows = await fetchSheetValues('A2:H', config.turn, env)
   const items = []
+  const turn = config.turn || 'MAFIA'
 
   for (const row of rows) {
     const name = (row[0] || '').trim()
@@ -142,9 +143,11 @@ async function loadIntervalBosses(config, now, env) {
     if (deathStr && /^(0?1)[\/\-](0?1)[\/\-]2012/.test(deathStr)) continue
     const lastDeath = parseDeathDate(deathStr)
     if (!lastDeath || !interval) continue
-    const id = 'ib-' + name.toLowerCase().replace(/\s+/g, '-')
+    const slug = name.toLowerCase().replace(/\s+/g, '-')
+    // Sertakan turn agar boss sama di MAFIA & MAFIAx2 tidak bentrok / dobel tag
+    const id = `ib-${turn}-${slug}`
     const nextSpawn = lastDeath.getTime() + interval * 3600 * 1000
-    items.push({ id, name, msLeft: nextSpawn - now.getTime() })
+    items.push({ id, name, turn, msLeft: nextSpawn - now.getTime() })
   }
 
   return items
@@ -154,6 +157,7 @@ async function loadIntervalBosses(config, now, env) {
 async function loadWeeklyBosses(config, now, env) {
   const rows = await fetchSheetValues('A17:D', config.turn, env)
   const bossMap = {}
+  const turn = config.turn || 'MAFIA'
 
   for (const row of rows) {
     const name = (row[0] || '').trim()
@@ -162,8 +166,9 @@ async function loadWeeklyBosses(config, now, env) {
     const day = DAY_MAP[dayName.toLowerCase()]
     const time = parseTime12h(row[3] || '')
     if (day === undefined || !time) continue
-    const id = 'wb-' + name.toLowerCase().replace(/\s+/g, '-')
-    if (!bossMap[id]) bossMap[id] = { id, name, schedules: [] }
+    const slug = name.toLowerCase().replace(/\s+/g, '-')
+    const id = `wb-${turn}-${slug}`
+    if (!bossMap[id]) bossMap[id] = { id, name, turn, schedules: [] }
     bossMap[id].schedules.push({ day, time })
   }
 
@@ -175,7 +180,7 @@ async function loadWeeklyBosses(config, now, env) {
       if (!soonest || n < soonest) soonest = n
     }
     if (soonest) {
-      items.push({ id: b.id, name: b.name, msLeft: soonest.getTime() - now.getTime() })
+      items.push({ id: b.id, name: b.name, turn: b.turn, msLeft: soonest.getTime() - now.getTime() })
     }
   }
 
@@ -229,16 +234,19 @@ export const PUSH_MILESTONES = [
 
 export function collectDueNotifications(items) {
   const due = []
+  const seen = new Set()
   for (const item of items) {
     for (const m of PUSH_MILESTONES) {
-      if (m.match(item.msLeft)) {
-        due.push({
-          title: m.title,
-          body: m.body(item.name),
-          tag: `boss-${item.id}-${m.id}`,
-          vibrate: [300, 100, 300, 100, 500],
-        })
-      }
+      if (!m.match(item.msLeft)) continue
+      const tag = `boss-${item.id}-${m.id}`
+      if (seen.has(tag)) continue
+      seen.add(tag)
+      due.push({
+        title: m.title,
+        body: m.body(item.name),
+        tag,
+        vibrate: [300, 100, 300, 100, 500],
+      })
     }
   }
   return due
