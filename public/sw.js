@@ -10,8 +10,8 @@ self.addEventListener('push', (event) => {
   let data = {
     title: 'Mafia Timer',
     body: '',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/3551739.jpg',
+    badge: '/3551739.jpg',
   }
   if (event.data) {
     try {
@@ -26,20 +26,20 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body,
-    icon: data.icon || '/favicon.ico',
-    badge: data.badge || '/favicon.ico',
+    icon: data.icon || '/3551739.jpg',
+    badge: data.badge || '/3551739.jpg',
     tag: data.tag || 'boss-timer',
     renotify: true,
+    silent: false, // suara sistem OS saat tab tertutup / background
     vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
-    // Suara custom diputar dari tab terbuka via postMessage; OS sound sebagai fallback
+    // Suara custom (alert.mp3) hanya jika ada tab terbuka
     data: { url: '/', playSound: true },
   }
 
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(data.title || 'Mafia Timer', options),
-      // Jika ada tab terbuka, minta mainkan suara custom
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
         for (const client of windowClients) {
           client.postMessage({ type: 'PLAY_ALERT_SOUND' })

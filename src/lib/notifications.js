@@ -1,4 +1,5 @@
 const NOTIFIED_KEY = 'boss-timer-notified-v1'
+const AUDIO_UNLOCK_KEY = 'boss-timer-audio-unlocked-v1'
 const ALERT_SOUND_URL = '/alert.mp3'
 
 /** @type {Map<string, Set<string>>} */
@@ -6,7 +7,15 @@ let notified = new Map()
 
 /** @type {HTMLAudioElement | null} */
 let alertAudio = null
+/** @type {AudioContext | null} */
+let audioCtx = null
 let audioUnlocked = false
+
+try {
+  audioUnlocked = localStorage.getItem(AUDIO_UNLOCK_KEY) === '1'
+} catch {
+  /* ignore */
+}
 
 function loadNotified() {
   try {
@@ -29,18 +38,42 @@ function saveNotified() {
 
 loadNotified()
 
+function markAudioUnlocked() {
+  audioUnlocked = true
+  try {
+    localStorage.setItem(AUDIO_UNLOCK_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
 function getAlertAudio() {
   if (typeof Audio === 'undefined') return null
   if (!alertAudio) {
     alertAudio = new Audio(ALERT_SOUND_URL)
     alertAudio.preload = 'auto'
     alertAudio.volume = 1
+    // iOS Safari: wajib agar play() tidak dianggap video fullscreen
+    alertAudio.setAttribute('playsinline', 'true')
+    alertAudio.playsInline = true
   }
   return alertAudio
 }
 
-/** Unlock audio setelah gesture user (klik / tap) — wajib di Chrome */
+async function resumeAudioContext() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    if (!audioCtx) audioCtx = new Ctx()
+    if (audioCtx.state === 'suspended') await audioCtx.resume()
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Unlock audio setelah gesture user (klik / tap) — wajib di Chrome/Safari */
 export async function unlockAudio() {
+  await resumeAudioContext()
   const audio = getAlertAudio()
   if (!audio) return false
   try {
@@ -49,29 +82,38 @@ export async function unlockAudio() {
     audio.pause()
     audio.currentTime = 0
     audio.muted = false
-    audioUnlocked = true
+    markAudioUnlocked()
     return true
-  } catch {
+  } catch (e) {
+    console.warn('Unlock audio gagal (butuh klik user dulu):', e?.message || e)
     return false
   }
 }
 
+export function isAudioUnlocked() {
+  return audioUnlocked
+}
+
 /** Putar suara alert custom */
 export async function playAlertSound() {
+  await resumeAudioContext()
   const audio = getAlertAudio()
   if (!audio) return false
   try {
     if (!audioUnlocked) {
-      await unlockAudio()
+      const ok = await unlockAudio()
+      if (!ok) return false
     }
     audio.pause()
     audio.currentTime = 0
     audio.muted = false
     audio.volume = 1
     await audio.play()
+    markAudioUnlocked()
     return true
   } catch (e) {
     console.warn('Gagal putar suara notif:', e)
+    audioUnlocked = false
     return false
   }
 }
@@ -81,35 +123,59 @@ export function isNotificationGranted() {
   return typeof Notification !== 'undefined' && Notification.permission === 'granted'
 }
 
+export function getNotificationPermission() {
+  if (typeof Notification === 'undefined') return 'unsupported'
+  return Notification.permission
+}
+
 /** Request permission — hanya panggil dari klik user */
 export async function ensureNotificationPermission() {
   if (typeof Notification === 'undefined') return false
 
-  let granted = Notification.permission === 'granted'
-  if (!granted && Notification.permission !== 'denied') {
-    const result = await Notification.requestPermission()
-    granted = result === 'granted'
-  }
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
 
-  return granted
+  // Harus dari user gesture; Chrome kadang butuh Promise API
+  try {
+    const result = await Notification.requestPermission()
+    return result === 'granted'
+  } catch {
+    return false
+  }
 }
 
 /**
- * Permission + subscribe Web Push (agar notif tetap muncul saat browser minimize).
+ * Permission + unlock suara + subscribe Web Push.
  */
 export async function enableNotificationsWithPush() {
+  if (typeof Notification === 'undefined') {
+    return { granted: false, push: false, sound: false, reason: 'unsupported' }
+  }
+  if (Notification.permission === 'denied') {
+    return { granted: false, push: false, sound: false, reason: 'denied' }
+  }
+
   const granted = await ensureNotificationPermission()
-  if (!granted) return { granted: false, push: false }
-  // Unlock audio saat user klik izinkan notif
-  await unlockAudio()
+  if (!granted) {
+    return {
+      granted: false,
+      push: false,
+      sound: false,
+      reason: Notification.permission === 'denied' ? 'denied' : 'dismissed',
+    }
+  }
+
+  // Unlock audio SAAT klik — ini satu-satunya “izin suara” yang browser izinkan
+  const sound = await unlockAudio()
+
   try {
     const { subscribeToPush, isPushSupported } = await import('./push.js')
-    if (!isPushSupported()) return { granted: true, push: false }
+    if (!isPushSupported()) return { granted: true, push: false, sound }
     const sub = await subscribeToPush()
-    return { granted: true, push: !!sub }
+    return { granted: true, push: !!sub, sound }
   } catch (e) {
     console.warn('Push subscribe gagal:', e)
-    return { granted: true, push: false }
+    return { granted: true, push: false, sound }
   }
 }
 
@@ -156,7 +222,7 @@ const MILESTONES = [
 
 /**
  * Cek daftar boss dan kirim notifikasi browser jika melewati milestone.
- * Suara custom (alert.mp3) diputar jika tab masih terbuka.
+ * Suara custom (alert.mp3) diputar jika tab masih terbuka + audio sudah di-unlock.
  * @param {Array<{id: string, name: string, msLeft: number}>} items
  */
 export function checkAndNotify(items) {
@@ -166,20 +232,22 @@ export function checkAndNotify(items) {
     for (const m of MILESTONES) {
       if (m.match(item.msLeft) && !alreadyFired(item.id, m.id)) {
         markFired(item.id, m.id)
-        playAlertSound()
 
-        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        // Coba suara custom; jika gagal, biarkan notifikasi OS bunyi (silent: false)
+        playAlertSound().then((played) => {
+          if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
           try {
             new Notification(m.title, {
               body: m.body(item.name),
               tag: `boss-${item.id}-${m.id}`,
               renotify: true,
-              silent: true, // suara custom sudah diputar; hindari double sound OS
+              icon: '/3551739.jpg',
+              silent: played, // true = custom sudah bunyi; false = pakai suara OS
             })
           } catch (e) {
             console.warn('Gagal kirim notifikasi:', e)
           }
-        }
+        })
       }
     }
   }

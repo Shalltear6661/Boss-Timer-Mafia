@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
-  import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush } from './lib/notifications.js'
+  import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
   import {
     getAuthConfig,
     fetchMe,
@@ -117,6 +117,9 @@
   let notifSupported = typeof Notification !== 'undefined'
   // Baca permission langsung agar banner tidak muncul lagi setelah refresh
   let notifEnabled = typeof Notification !== 'undefined' && Notification.permission === 'granted'
+  let notifDenied = typeof Notification !== 'undefined' && Notification.permission === 'denied'
+  let soundReady = false
+  let notifHint = ''
   let pushEnabled = false
   let pushSupported =
     typeof window !== 'undefined' &&
@@ -132,6 +135,31 @@
       ? window.matchMedia(MOBILE_MQ).matches
       : true
   let mobileMq
+
+  async function onEnableNotifClick() {
+    notifHint = ''
+    const result = await enableNotificationsWithPush()
+    notifEnabled = result.granted
+    notifDenied = getNotificationPermission() === 'denied'
+    pushEnabled = result.push
+    soundReady = !!result.sound || isAudioUnlocked()
+    if (result.reason === 'denied') {
+      notifHint =
+        'Izin notifikasi diblokir browser. Buka gembok URL → Site settings → Notifications → Allow, lalu refresh.'
+    } else if (result.granted && !result.sound) {
+      notifHint = 'Notifikasi aktif. Ketuk “Tes Suara” sekali agar alert.mp3 diizinkan browser.'
+    } else if (result.granted && !result.push) {
+      notifHint = 'Notifikasi aktif. Push belum siap — cek VAPID di Railway Variables.'
+    }
+  }
+
+  async function onTestSoundClick() {
+    const ok = await playAlertSound()
+    soundReady = ok || isAudioUnlocked()
+    notifHint = ok
+      ? 'Suara OK. Alert akan bunyi saat tab terbuka.'
+      : 'Gagal putar suara. Pastikan tab tidak di-mute dan izinkan Sound untuk situs ini.'
+  }
 
   $: tzOption = getTimezoneOption(tzId)
   $: displayTimeZone = tzOption.tz
@@ -433,6 +461,8 @@
     if (ENABLE_MARK_KILLED) initAuth()
     else authReady = true
     notifEnabled = isNotificationGranted()
+    notifDenied = getNotificationPermission() === 'denied'
+    soundReady = isAudioUnlocked()
     // Re-subscribe push jika permission sudah granted (refresh / reopen)
     if (notifEnabled && pushSupported) {
       import('./lib/push.js')
@@ -455,8 +485,9 @@
       else mobileMq.addListener(onMq)
       mobileMq._onChange = onMq
     }
-    const unlockOnce = () => {
-      unlockAudio()
+    const unlockOnce = async () => {
+      const ok = await unlockAudio()
+      soundReady = ok || isAudioUnlocked()
       window.removeEventListener('pointerdown', unlockOnce)
     }
     window.addEventListener('pointerdown', unlockOnce)
@@ -625,32 +656,32 @@
     </div>
   {/if}
 
-  {#if !notifEnabled && notifSupported}
+  {#if notifDenied}
+    <div class="notif-banner warn">
+      <span>
+        Notifikasi diblokir untuk situs ini. Di Chrome: gembok URL → Site settings → Notifications →
+        <strong>Allow</strong>, lalu refresh halaman Railway.
+      </span>
+    </div>
+  {:else if !notifEnabled && notifSupported}
     <div class="notif-banner">
-      <span>Aktifkan notifikasi agar alert spawn tetap muncul saat minimize.</span>
-      <button
-        on:click={async () => {
-          const result = await enableNotificationsWithPush()
-          notifEnabled = result.granted
-          pushEnabled = result.push
-        }}
-      >
-        Izinkan
-      </button>
+      <span>Aktifkan notifikasi + suara agar alert spawn tetap muncul (termasuk saat minimize).</span>
+      <button type="button" on:click={onEnableNotifClick}>Izinkan</button>
     </div>
   {:else if notifEnabled && pushSupported && !pushEnabled}
     <div class="notif-banner">
       <span>Aktifkan Web Push untuk notifikasi di background.</span>
-      <button
-        on:click={async () => {
-          const result = await enableNotificationsWithPush()
-          notifEnabled = result.granted
-          pushEnabled = result.push
-        }}
-      >
-        Aktifkan Push
-      </button>
+      <button type="button" on:click={onEnableNotifClick}>Aktifkan Push</button>
+      <button type="button" class="notif-secondary" on:click={onTestSoundClick}>Tes Suara</button>
     </div>
+  {:else if notifEnabled && !soundReady}
+    <div class="notif-banner">
+      <span>Notifikasi aktif. Ketuk sekali untuk mengizinkan suara alert di browser ini.</span>
+      <button type="button" on:click={onTestSoundClick}>Tes Suara</button>
+    </div>
+  {/if}
+  {#if notifHint}
+    <p class="notif-hint">{notifHint}</p>
   {/if}
 
   {#if searching && searchHitCount === 0}
@@ -1079,6 +1110,11 @@
     font-size: 12px;
     color: #c8c0e8;
   }
+  .notif-banner.warn {
+    background: rgba(180, 120, 40, 0.12);
+    border-color: rgba(200, 140, 50, 0.45);
+    color: #e8c48a;
+  }
   .notif-banner button {
     background: #4a3a8a;
     border: none;
@@ -1090,8 +1126,17 @@
     font-weight: 600;
     font-family: inherit;
   }
+  .notif-banner button.notif-secondary {
+    background: #2a3348;
+    color: #d5dced;
+  }
   .notif-banner button:hover {
     background: #5a48a8;
+  }
+  .notif-hint {
+    margin: -4px 0 12px;
+    font-size: 11px;
+    color: #8a8aa0;
   }
   .empty-hint {
     margin: 0;
