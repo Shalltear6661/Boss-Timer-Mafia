@@ -4,14 +4,14 @@ export const SOURCE_TZ = 'Asia/Jakarta'
 export const TIMEZONE_OPTIONS = [
   {
     id: 'id',
-    label: 'Indonesia',
+    label: 'ID',
     short: 'WIB',
     tz: 'Asia/Jakarta',
   },
   {
     id: 'my',
-    label: 'Malaysia',
-    short: 'MYT',
+    label: 'MY/PH',
+    short: 'MYT/PHT',
     tz: 'Asia/Kuala_Lumpur',
   },
 ]
