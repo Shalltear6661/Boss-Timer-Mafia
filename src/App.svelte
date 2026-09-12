@@ -473,13 +473,46 @@
     sortedBosses.filter((b) => !searchNeedle || String(b.name || '').toLowerCase().includes(searchNeedle))
   )
   $: searching = searchNeedle.length > 0
-  $: filteredLoots = lootItems.filter(
-    (item) =>
-      matchesSearch(item.name) ||
-      matchesSearch(item.holder) ||
-      matchesSearch(item.turn) ||
-      matchesSearch(item.categoryLabel)
-  )
+  $: filteredLoots = lootItems
+    .map((item) => {
+      if (item.category && item.categoryLabel) return item
+      const name = String(item.name || '')
+      let category = 'other'
+      let categoryLabel = 'Lain-lain'
+      if (/^ability\b/i.test(name) || /\bability\s*:/i.test(name)) {
+        category = 'ability'
+        categoryLabel = 'Ability'
+      } else if (/\bcloak\b/i.test(name)) {
+        category = 'cloak'
+        categoryLabel = 'Cloak'
+      } else if (/\bring\b/i.test(name)) {
+        category = 'ring'
+        categoryLabel = 'Ring'
+      } else if (/\bearrings?\b/i.test(name)) {
+        category = 'earrings'
+        categoryLabel = 'Earrings'
+      } else if (/\bbracelet\b/i.test(name)) {
+        category = 'bracelet'
+        categoryLabel = 'Bracelet'
+      } else if (/\bbelt\b/i.test(name)) {
+        category = 'belt'
+        categoryLabel = 'Belt'
+      } else if (/\b(armor|pants|gauntlets?|gloves?|helmet|boots?)\b/i.test(name)) {
+        category = 'armor'
+        categoryLabel = 'Armor'
+      } else if (/\bsaddle\b/i.test(name)) {
+        category = 'saddle'
+        categoryLabel = 'Saddle'
+      }
+      return { ...item, category, categoryLabel }
+    })
+    .filter(
+      (item) =>
+        matchesSearch(item.name) ||
+        matchesSearch(item.holder) ||
+        matchesSearch(item.turn) ||
+        matchesSearch(item.categoryLabel)
+    )
   $: lootTotalQty = filteredLoots.reduce((n, item) => n + (item.qty || 1), 0)
   $: lootGroups = (() => {
     const map = new Map()
@@ -501,12 +534,8 @@
       : bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
         weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
 
-  function isLootGroupOpen(id) {
-    if (searching) return true
-    return lootAccordionOpen[id] !== false
-  }
-
   function toggleLootGroup(id) {
+    // default terbuka (undefined !== false); klik = tutup/buka
     const currentlyOpen = lootAccordionOpen[id] !== false
     lootAccordionOpen = {
       ...lootAccordionOpen,
@@ -908,18 +937,19 @@
       <p class="loot-meta">{lootTotalQty} item · {lootGroups.length} kategori · MAFIA + MAFIAx2</p>
       <div class="loot-accordions">
         {#each lootGroups as group (group.id)}
-          <div class="loot-acc" class:open={isLootGroupOpen(group.id)}>
+          {@const groupOpen = lootAccordionOpen[group.id] !== false}
+          <div class="loot-acc" class:open={groupOpen}>
             <button
               type="button"
               class="loot-acc-head"
-              aria-expanded={isLootGroupOpen(group.id)}
+              aria-expanded={groupOpen}
               on:click={() => toggleLootGroup(group.id)}
             >
               <span class="loot-acc-chevron" aria-hidden="true">▸</span>
               <span class="loot-acc-label">{group.label}</span>
               <span class="loot-acc-count">{group.qty}</span>
             </button>
-            {#if isLootGroupOpen(group.id)}
+            {#if groupOpen}
               <ul class="loot-list">
                 {#each group.items as item (item.id)}
                   <li
