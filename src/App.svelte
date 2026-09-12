@@ -132,6 +132,8 @@
   let lootItems = []
   let lootLoading = false
   let lootError = ''
+  /** @type {Record<string, boolean>} accordion terbuka per kategori (default: terbuka) */
+  let lootAccordionOpen = {}
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
   let isMobile =
@@ -475,14 +477,42 @@
     (item) =>
       matchesSearch(item.name) ||
       matchesSearch(item.holder) ||
-      matchesSearch(item.turn)
+      matchesSearch(item.turn) ||
+      matchesSearch(item.categoryLabel)
   )
   $: lootTotalQty = filteredLoots.reduce((n, item) => n + (item.qty || 1), 0)
+  $: lootGroups = (() => {
+    const map = new Map()
+    for (const item of filteredLoots) {
+      const id = item.category || 'other'
+      const label = item.categoryLabel || 'Lain-lain'
+      if (!map.has(id)) {
+        map.set(id, { id, label, items: [], qty: 0 })
+      }
+      const g = map.get(id)
+      g.items.push(item)
+      g.qty += item.qty || 1
+    }
+    return [...map.values()]
+  })()
   $: searchHitCount =
     mainTab === 'loot'
       ? filteredLoots.length
       : bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
         weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
+
+  function isLootGroupOpen(id) {
+    if (searching) return true
+    return lootAccordionOpen[id] !== false
+  }
+
+  function toggleLootGroup(id) {
+    const currentlyOpen = lootAccordionOpen[id] !== false
+    lootAccordionOpen = {
+      ...lootAccordionOpen,
+      [id]: !currentlyOpen,
+    }
+  }
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
   $: if (bosses.length) {
@@ -875,27 +905,53 @@
         {/if}
       </p>
     {:else}
-      <p class="loot-meta">{lootTotalQty} item · MAFIA + MAFIAx2</p>
-      <ul class="loot-list">
-        {#each filteredLoots as item (item.id)}
-          <li class="loot-row" class:mafia={item.turn === 'MAFIA'} class:mafiax2={item.turn === 'MAFIAx2'}>
-            <div class="loot-main">
-              <span class="loot-name">{item.name}</span>
-              {#if item.qty > 1}
-                <span class="loot-qty">×{item.qty}</span>
-              {/if}
-            </div>
-            <div class="loot-side">
-              {#if item.holder}
-                <span class="loot-holder">{item.holder}</span>
-              {/if}
-              <span class="loot-turn" class:mafia={item.turn === 'MAFIA'} class:mafiax2={item.turn === 'MAFIAx2'}>
-                {item.turn}
-              </span>
-            </div>
-          </li>
+      <p class="loot-meta">{lootTotalQty} item · {lootGroups.length} kategori · MAFIA + MAFIAx2</p>
+      <div class="loot-accordions">
+        {#each lootGroups as group (group.id)}
+          <div class="loot-acc" class:open={isLootGroupOpen(group.id)}>
+            <button
+              type="button"
+              class="loot-acc-head"
+              aria-expanded={isLootGroupOpen(group.id)}
+              on:click={() => toggleLootGroup(group.id)}
+            >
+              <span class="loot-acc-chevron" aria-hidden="true">▸</span>
+              <span class="loot-acc-label">{group.label}</span>
+              <span class="loot-acc-count">{group.qty}</span>
+            </button>
+            {#if isLootGroupOpen(group.id)}
+              <ul class="loot-list">
+                {#each group.items as item (item.id)}
+                  <li
+                    class="loot-row"
+                    class:mafia={item.turn === 'MAFIA'}
+                    class:mafiax2={item.turn === 'MAFIAx2'}
+                  >
+                    <div class="loot-main">
+                      <span class="loot-name">{item.name}</span>
+                      {#if item.qty > 1}
+                        <span class="loot-qty">×{item.qty}</span>
+                      {/if}
+                    </div>
+                    <div class="loot-side">
+                      {#if item.holder}
+                        <span class="loot-holder">{item.holder}</span>
+                      {/if}
+                      <span
+                        class="loot-turn"
+                        class:mafia={item.turn === 'MAFIA'}
+                        class:mafiax2={item.turn === 'MAFIAx2'}
+                      >
+                        {item.turn}
+                      </span>
+                    </div>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
         {/each}
-      </ul>
+      </div>
     {/if}
   </section>
   {/if}
@@ -1522,6 +1578,66 @@
     margin: 0 0 10px;
     font-size: 12px;
     color: #8a8aa0;
+  }
+  .loot-accordions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .loot-acc {
+    border: 1px solid #2a2a38;
+    border-radius: 12px;
+    background: #14141e;
+    overflow: hidden;
+  }
+  .loot-acc-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 0;
+    background: transparent;
+    color: #f0eef7;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .loot-acc-head:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .loot-acc-chevron {
+    display: inline-flex;
+    width: 1em;
+    color: #f0b428;
+    transition: transform 0.18s ease;
+    font-size: 12px;
+  }
+  .loot-acc.open .loot-acc-chevron {
+    transform: rotate(90deg);
+  }
+  .loot-acc-label {
+    flex: 1;
+    min-width: 0;
+  }
+  .loot-acc-count {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  .loot-acc .loot-list {
+    padding: 0 8px 8px;
   }
   .loot-list {
     list-style: none;
