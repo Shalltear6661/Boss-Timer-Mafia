@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 import auth from './api/auth.js'
 import sheets from './api/sheets.js'
+import loots from './api/loots.js'
 import kill from './api/kill.js'
 import pushVapid from './api/push-vapid.js'
 import pushSubscribe from './api/push-subscribe.js'
@@ -67,6 +68,7 @@ const ASSET_EXTS = new Set(Object.keys(MIME).filter((e) => e !== '.html'))
 const routes = [
   [/^\/api\/auth\/?$/, auth],
   [/^\/api\/sheets\/?$/, sheets],
+  [/^\/api\/loots\/?$/, loots],
   [/^\/api\/kill\/?$/, kill],
   [/^\/api\/push-vapid\/?$/, pushVapid],
   [/^\/api\/push-subscribe\/?$/, pushSubscribe],

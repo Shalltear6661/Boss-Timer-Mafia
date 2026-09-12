@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
-  import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled } from './lib/spreadsheet.js'
+  import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled, fetchUnsoldLoots } from './lib/spreadsheet.js'
   import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
   import {
     getAuthConfig,
@@ -128,6 +128,10 @@
   let searchQuery = ''
   let searchOpen = false
   let searchInputEl
+  let mainTab = 'jadwal' // 'jadwal' | 'loot'
+  let lootItems = []
+  let lootLoading = false
+  let lootError = ''
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
   let isMobile =
@@ -286,6 +290,31 @@
     }
   }
 
+  async function syncLoots() {
+    if (lootLoading) return
+    lootLoading = true
+    lootError = ''
+    try {
+      const { items, errors } = await fetchUnsoldLoots()
+      lootItems = items
+      if (errors?.length && items.length === 0) {
+        lootError = errors.join('; ')
+      }
+    } catch (e) {
+      console.warn('Gagal load loot:', e)
+      lootError = e.message || 'Gagal load loot'
+    } finally {
+      lootLoading = false
+    }
+  }
+
+  function setMainTab(tab) {
+    mainTab = tab
+    if (tab === 'loot' && lootItems.length === 0 && !lootLoading) {
+      syncLoots()
+    }
+  }
+
   function load() {
     loadFromStorage()
     syncFromSpreadsheet()
@@ -304,7 +333,12 @@
 
   async function refreshFromSpreadsheet() {
     spreadsheetStatus = 'loading'
-    await syncFromSpreadsheet()
+    if (mainTab === 'loot') {
+      await syncLoots()
+      spreadsheetStatus = lootError ? 'cache' : 'live'
+    } else {
+      await syncFromSpreadsheet()
+    }
   }
 
   async function markKilled(boss, deathDate) {
@@ -436,10 +470,19 @@
   $: bossesByTurn = groupByTurn(
     sortedBosses.filter((b) => !searchNeedle || String(b.name || '').toLowerCase().includes(searchNeedle))
   )
-  $: searchHitCount =
-    bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
-    weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
   $: searching = searchNeedle.length > 0
+  $: filteredLoots = lootItems.filter(
+    (item) =>
+      matchesSearch(item.name) ||
+      matchesSearch(item.holder) ||
+      matchesSearch(item.turn)
+  )
+  $: lootTotalQty = filteredLoots.reduce((n, item) => n + (item.qty || 1), 0)
+  $: searchHitCount =
+    mainTab === 'loot'
+      ? filteredLoots.length
+      : bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
+        weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
   $: if (bosses.length) {
@@ -500,9 +543,11 @@
     }
     window.addEventListener('pointerdown', unlockOnce)
 
-    // Web Push → minta tab terbuka putar suara custom
+    // Web Push → tab terbuka: putar suara (notif OS ditahan jika tab focused)
     const onSwMessage = (event) => {
-      if (event.data?.type === 'PLAY_ALERT_SOUND') playAlertSound()
+      if (event.data?.type === 'PLAY_ALERT_SOUND' || event.data?.type === 'PUSH_RECEIVED') {
+        playAlertSound()
+      }
     }
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.addEventListener('message', onSwMessage)
@@ -605,7 +650,7 @@
         <input
           type="search"
           class="search-input"
-          placeholder="Cari boss by nama..."
+          placeholder="Cari boss / loot..."
           bind:value={searchQuery}
           bind:this={searchInputEl}
           autocomplete="off"
@@ -693,9 +738,38 @@
   {/if}
 
   {#if searching && searchHitCount === 0}
-    <p class="empty-hint search-empty">Tidak ada boss bernama “{searchQuery.trim()}”.</p>
+    <p class="empty-hint search-empty">
+      {#if mainTab === 'loot'}
+        Tidak ada loot “{searchQuery.trim()}”.
+      {:else}
+        Tidak ada boss bernama “{searchQuery.trim()}”.
+      {/if}
+    </p>
   {/if}
 
+  <nav class="app-tabs" aria-label="Menu utama">
+    <button
+      type="button"
+      class="app-tab"
+      class:active={mainTab === 'jadwal'}
+      on:click={() => setMainTab('jadwal')}
+    >
+      Jadwal
+    </button>
+    <button
+      type="button"
+      class="app-tab"
+      class:active={mainTab === 'loot'}
+      on:click={() => setMainTab('loot')}
+    >
+      Loot
+      {#if lootItems.length > 0}
+        <span class="app-tab-count">{lootItems.reduce((n, i) => n + (i.qty || 1), 0)}</span>
+      {/if}
+    </button>
+  </nav>
+
+  {#if mainTab === 'jadwal'}
   <section>
     <h2 class="section-title cooldown">COOLDOWN</h2>
     {#if bossesByTurn.length === 0}
@@ -785,6 +859,46 @@
       </div>
     {/if}
   </section>
+  {:else}
+  <section class="loot-section">
+    <h2 class="section-title loot-title">Belum Terjual</h2>
+    {#if lootLoading && lootItems.length === 0}
+      <p class="empty-hint">Memuat loot...</p>
+    {:else if lootError && lootItems.length === 0}
+      <p class="empty-hint">{lootError}</p>
+    {:else if filteredLoots.length === 0}
+      <p class="empty-hint">
+        {#if searching}
+          Tidak ada loot yang cocok.
+        {:else}
+          Tidak ada barang belum terjual.
+        {/if}
+      </p>
+    {:else}
+      <p class="loot-meta">{lootTotalQty} item · MAFIA + MAFIAx2</p>
+      <ul class="loot-list">
+        {#each filteredLoots as item (item.id)}
+          <li class="loot-row" class:mafia={item.turn === 'MAFIA'} class:mafiax2={item.turn === 'MAFIAx2'}>
+            <div class="loot-main">
+              <span class="loot-name">{item.name}</span>
+              {#if item.qty > 1}
+                <span class="loot-qty">×{item.qty}</span>
+              {/if}
+            </div>
+            <div class="loot-side">
+              {#if item.holder}
+                <span class="loot-holder">{item.holder}</span>
+              {/if}
+              <span class="loot-turn" class:mafia={item.turn === 'MAFIA'} class:mafiax2={item.turn === 'MAFIAx2'}>
+                {item.turn}
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+  {/if}
 
   <footer>
     <p class="footer-note">Sync spreadsheet tiap menit · Editor: Tandai Mati</p>
@@ -1345,6 +1459,146 @@
     );
     border-color: rgba(168, 85, 247, 0.42);
     box-shadow: inset 0 1px 0 rgba(200, 160, 255, 0.15);
+  }
+  .section-title.loot-title {
+    color: #bbf7d0;
+    background: linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.24) 0%,
+      rgba(22, 101, 52, 0.12) 55%,
+      rgba(20, 20, 30, 0.4) 100%
+    );
+    border-color: rgba(34, 197, 94, 0.4);
+    box-shadow: inset 0 1px 0 rgba(134, 239, 172, 0.15);
+  }
+
+  .app-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .app-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2a2a38;
+    background: #14141e;
+    color: #8a8aa0;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .app-tab:hover {
+    color: #d8d8e6;
+    border-color: #3a3a4a;
+  }
+  .app-tab.active {
+    color: #f0eef7;
+    border-color: rgba(240, 180, 40, 0.45);
+    background: linear-gradient(135deg, rgba(240, 180, 40, 0.18), rgba(20, 20, 30, 0.9));
+  }
+  .app-tab-count {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    color: inherit;
+    opacity: 0.8;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
+
+  .loot-meta {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: #8a8aa0;
+  }
+  .loot-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .loot-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2a2a38;
+    border-left: 3px solid #35354a;
+    background: #1a1a26;
+  }
+  .loot-row.mafia {
+    border-left-color: #3b82f6;
+    background: rgba(37, 99, 235, 0.08);
+  }
+  .loot-row.mafiax2 {
+    border-left-color: #a855f7;
+    background: rgba(147, 51, 234, 0.1);
+  }
+  .loot-main {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .loot-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f0eef7;
+  }
+  .loot-qty {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #f0b428;
+  }
+  .loot-side {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .loot-holder {
+    font-size: 11px;
+    color: #8a8aa0;
+    max-width: 110px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .loot-turn {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .loot-turn.mafia {
+    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.35);
+  }
+  .loot-turn.mafiax2 {
+    color: #e9d5ff;
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.35);
   }
 
   .card-grid {

@@ -30,7 +30,7 @@ async function sheetsFetch(url, accessToken, options = {}) {
 
 /** Pastikan sheet PushSubs ada + header di baris 1 */
 export async function ensurePushSheet(env = process.env) {
-  const { spreadsheetId } = getSheetsConfig(env)
+  const { spreadsheetId } = getSheetsConfig('', env)
   const accessToken = await getAccessToken(env)
 
   const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties.title`

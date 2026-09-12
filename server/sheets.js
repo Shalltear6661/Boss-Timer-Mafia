@@ -134,8 +134,11 @@ export function getAllSheetConfigs(env = process.env) {
   }))
 }
 
-async function fetchSheetValuesUncached(range, turn, env) {
-  const { apiKey, spreadsheetId, sheetName } = getSheetsConfig(turn, env)
+async function fetchSheetValuesUncached(range, turn, env, sheetOverride = '') {
+  const cfg = getSheetsConfig(turn, env)
+  const apiKey = cfg.apiKey
+  const spreadsheetId = cfg.spreadsheetId
+  const sheetName = String(sheetOverride || cfg.sheetName).replace(/[\r\n]+/g, ' ').trim()
   if (!range || !/^[A-Z0-9:]+$/i.test(range)) {
     throw new Error('Range tidak valid')
   }
@@ -185,10 +188,12 @@ async function fetchSheetValuesUncached(range, turn, env) {
 /**
  * Fetch values dari sheet tertentu.
  * Prioritas auth: Service Account → API Key (untuk sheet private).
+ * options.sheetName — override nama tab (mis. "Loot")
  * skipCache=true untuk baca paksa (jarang dipakai).
  */
-export async function fetchSheetValues(range, turn = '', env = process.env, { skipCache = false } = {}) {
-  const { spreadsheetId, sheetName } = getSheetsConfig(turn, env)
+export async function fetchSheetValues(range, turn = '', env = process.env, { skipCache = false, sheetName: sheetOverride = '' } = {}) {
+  const { spreadsheetId, sheetName: defaultSheet } = getSheetsConfig(turn, env)
+  const sheetName = String(sheetOverride || defaultSheet).replace(/[\r\n]+/g, ' ').trim()
   const key = cacheKey(spreadsheetId, sheetName, range)
 
   if (!skipCache) {
@@ -196,8 +201,10 @@ export async function fetchSheetValues(range, turn = '', env = process.env, { sk
     if (cached) return cached
   }
 
-  const { values } = await fetchSheetValuesUncached(range, turn, env)
+  const { values } = await fetchSheetValuesUncached(range, turn, env, sheetName)
   setCachedValues(key, values)
-  updateRowIndexFromValues(spreadsheetId, sheetName, range, values)
+  if (!sheetOverride) {
+    updateRowIndexFromValues(spreadsheetId, sheetName, range, values)
+  }
   return values
 }

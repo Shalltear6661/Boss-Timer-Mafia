@@ -30,6 +30,19 @@ export async function markBossKilled(name, deathISO, turn) {
   return data
 }
 
+/** Barang belum terjual dari sheet Loot (MAFIA + MAFIAx2 digabung) */
+export async function fetchUnsoldLoots() {
+  const res = await fetch('/api/loots')
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || `Gagal fetch loot: ${res.status}`)
+  }
+  return {
+    items: Array.isArray(data.items) ? data.items : [],
+    errors: Array.isArray(data.errors) ? data.errors : [],
+  }
+}
+
 /**
  * Parse tanggal kematian dari spreadsheet.
  * Support: "31/08/2026 16:32", "31-8-2026 0:00", "31-8-2026 16:32"

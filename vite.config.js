@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { fetchSheetValues } from './server/sheets.js'
+import { loadUnsoldLoots } from './server/loot.js'
 import { markBossKilledOnSheet } from './server/sheetsWrite.js'
 import {
   verifyGoogleIdToken,
@@ -127,6 +128,21 @@ function sheetsApiPlugin(env) {
       } catch (e) {
         console.error('[sheets-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Gagal fetch spreadsheet' })
+      }
+      return
+    }
+
+    if (url.startsWith('/api/loots')) {
+      try {
+        const { items, errors } = await loadUnsoldLoots(env)
+        sendJson(res, 200, {
+          items,
+          count: items.length,
+          errors: errors.length ? errors : undefined,
+        })
+      } catch (e) {
+        console.error('[loots-proxy]', e)
+        sendJson(res, 500, { error: e.message || 'Gagal load loot' })
       }
       return
     }

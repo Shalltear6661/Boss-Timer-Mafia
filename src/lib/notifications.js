@@ -244,7 +244,8 @@ const MILESTONES = [
   },
   {
     id: 'spawn',
-    match: (ms) => ms <= 2000 && ms > -60 * 1000,
+    // Window lebih lebar: tab di background sering di-throttle, interval 1s bisa miss 2 detik
+    match: (ms) => ms <= 15 * 1000 && ms > -60 * 1000,
     title: 'SPAWN!',
     body: (name) => `${name} sudah waktunya spawn sekarang!`,
   },

@@ -214,19 +214,21 @@ export async function loadWatchList(env = process.env, now = new Date()) {
 export const PUSH_MILESTONES = [
   {
     id: '10',
-    match: (ms) => ms <= 10 * 60 * 1000 && ms > 9 * 60 * 1000,
+    // Window ~2 menit agar cron tiap menit tidak mudah miss
+    match: (ms) => ms <= 10 * 60 * 1000 && ms > 8 * 60 * 1000,
     title: '10 menit lagi',
     body: (name) => `${name} akan spawn dalam ~10 menit`,
   },
   {
     id: '5',
-    match: (ms) => ms <= 5 * 60 * 1000 && ms > 4 * 60 * 1000,
+    match: (ms) => ms <= 5 * 60 * 1000 && ms > 3 * 60 * 1000,
     title: '5 menit lagi',
     body: (name) => `${name} akan spawn dalam ~5 menit`,
   },
   {
     id: 'spawn',
-    match: (ms) => ms <= 30 * 1000 && ms > -30 * 1000,
+    // ±2 menit — cron 1x/menit sering miss window ±30 detik
+    match: (ms) => ms <= 90 * 1000 && ms > -90 * 1000,
     title: 'SPAWN!',
     body: (name) => `${name} sudah waktunya spawn sekarang!`,
   },
@@ -240,7 +242,10 @@ export function collectDueNotifications(items) {
       if (!m.match(item.msLeft)) continue
       const tag = `boss-${item.id}-${m.id}`
       if (seen.has(tag)) continue
+      // Dedupe lintas pemanggilan cron (instance warm) — window melebar agar tidak spam
+      if (recentlyFired(tag)) continue
       seen.add(tag)
+      markRecentlyFired(tag)
       due.push({
         title: m.title,
         body: m.body(item.name),
@@ -250,4 +255,29 @@ export function collectDueNotifications(items) {
     }
   }
   return due
+}
+
+/** Cache singkat di memori proses — kurangi dobel kirim saat window milestone melebar */
+const recentlyFiredTags = new Map()
+const FIRED_TTL_MS = 8 * 60 * 1000
+
+function recentlyFired(tag) {
+  const at = recentlyFiredTags.get(tag)
+  if (!at) return false
+  if (Date.now() - at > FIRED_TTL_MS) {
+    recentlyFiredTags.delete(tag)
+    return false
+  }
+  return true
+}
+
+function markRecentlyFired(tag) {
+  recentlyFiredTags.set(tag, Date.now())
+  // Bersihkan entry lama
+  if (recentlyFiredTags.size > 200) {
+    const now = Date.now()
+    for (const [k, at] of recentlyFiredTags) {
+      if (now - at > FIRED_TTL_MS) recentlyFiredTags.delete(k)
+    }
+  }
 }

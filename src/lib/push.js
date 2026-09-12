@@ -92,14 +92,21 @@ export async function subscribeToPush() {
   localStorage.setItem(SUB_KEY, JSON.stringify(json))
 
   try {
-    await fetch('/api/push-subscribe', {
+    const res = await fetch('/api/push-subscribe', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subscription: json }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.warn('Gagal sync subscription ke server:', data.error || res.status)
+      // Subscription browser ada, tapi server belum punya → push background tidak jalan
+      return null
+    }
   } catch (e) {
     console.warn('Gagal sync subscription ke server:', e)
+    return null
   }
 
   return subscription

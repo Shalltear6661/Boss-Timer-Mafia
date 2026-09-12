@@ -29,24 +29,34 @@ self.addEventListener('push', (event) => {
     icon: data.icon || '/3551739.jpg',
     badge: data.badge || '/3551739.jpg',
     tag: data.tag || 'boss-timer',
-    renotify: false, // jangan bunyi ulang jika tag sama
+    renotify: false,
     silent: false,
     vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
-    data: { url: '/', playSound: true },
+    data: { url: '/', playSound: true, tag: data.tag || 'boss-timer' },
   }
 
   event.waitUntil(
     (async () => {
-      // Jika ada tab terbuka, biarkan client (checkAndNotify) yang handle —
-      // hindari notifikasi dobel: local Notification + Web Push.
       const windowClients = await clients.matchAll({
         type: 'window',
         includeUncontrolled: true,
       })
-      if (windowClients.length > 0) {
-        return
+
+      // Kabari tab terbuka: putar suara / sync state
+      for (const client of windowClients) {
+        try {
+          client.postMessage({ type: 'PUSH_RECEIVED', payload: data })
+        } catch {
+          /* ignore */
+        }
       }
+
+      // Hanya skip notifikasi OS jika ada tab yang sedang DIFOKUSKAN
+      // (user sedang lihat app). Tab terbuka tapi di background/minimize
+      // tetap harus dapat push — timer di background sering di-throttle browser.
+      const hasFocused = windowClients.some((c) => c.focused)
+      if (hasFocused) return
 
       await self.registration.showNotification(data.title || 'Mafia Timer', options)
     })()
