@@ -21,6 +21,7 @@
     formatDateInZone,
     zonedTimeToUtc,
   } from './lib/timezone.js'
+  import { categorizeLoot, LOOT_CATEGORIES } from './lib/lootCategory.js'
 
   const STORAGE_KEY = 'boss-timer-data-v3'
   const WEEKLY_STORAGE_KEY = 'boss-timer-weekly-v4'
@@ -475,36 +476,8 @@
   $: searching = searchNeedle.length > 0
   $: filteredLoots = lootItems
     .map((item) => {
-      if (item.category && item.categoryLabel) return item
-      const name = String(item.name || '')
-      let category = 'other'
-      let categoryLabel = 'Lain-lain'
-      if (/^ability\b/i.test(name) || /\bability\s*:/i.test(name)) {
-        category = 'ability'
-        categoryLabel = 'Ability'
-      } else if (/\bcloak\b/i.test(name)) {
-        category = 'cloak'
-        categoryLabel = 'Cloak'
-      } else if (/\bring\b/i.test(name)) {
-        category = 'ring'
-        categoryLabel = 'Ring'
-      } else if (/\bearrings?\b/i.test(name)) {
-        category = 'earrings'
-        categoryLabel = 'Earrings'
-      } else if (/\bbracelet\b/i.test(name)) {
-        category = 'bracelet'
-        categoryLabel = 'Bracelet'
-      } else if (/\bbelt\b/i.test(name)) {
-        category = 'belt'
-        categoryLabel = 'Belt'
-      } else if (/\b(armor|pants|gauntlets?|gloves?|helmet|boots?)\b/i.test(name)) {
-        category = 'armor'
-        categoryLabel = 'Armor'
-      } else if (/\bsaddle\b/i.test(name)) {
-        category = 'saddle'
-        categoryLabel = 'Saddle'
-      }
-      return { ...item, category, categoryLabel }
+      const cat = categorizeLoot(item.name)
+      return { ...item, category: cat.id, categoryLabel: cat.label }
     })
     .filter(
       (item) =>
@@ -526,7 +499,10 @@
       g.items.push(item)
       g.qty += item.qty || 1
     }
-    return [...map.values()]
+    const order = new Map(LOOT_CATEGORIES.map((c, i) => [c.id, i]))
+    return [...map.values()].sort(
+      (a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99)
+    )
   })()
   $: searchHitCount =
     mainTab === 'loot'
