@@ -156,7 +156,21 @@
     } else if (result.granted && !result.sound) {
       notifHint = 'Notifikasi aktif. Ketuk “Tes Suara” sekali agar alert.mp3 diizinkan browser.'
     } else if (result.granted && !result.push) {
-      notifHint = 'Notifikasi aktif. Push belum siap — cek VAPID di Railway Variables.'
+      const hints = {
+        vapid_missing:
+          'Notifikasi aktif. Push belum siap: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY belum terisi di Railway Variables (lalu Redeploy).',
+        server_sync:
+          'Notifikasi aktif. Push belum tersimpan ke server — cek sheet PushSubs + Service Account Editor.',
+        service_worker:
+          'Notifikasi aktif. Service Worker gagal (butuh HTTPS / jangan mode Incognito).',
+        subscribe_failed:
+          'Notifikasi aktif. Browser menolak subscribe push (coba hapus izin situs, lalu aktifkan lagi).',
+        browser_unsupported:
+          'Notifikasi aktif. Browser ini tidak support Web Push (iOS: pasang ke Home Screen).',
+      }
+      notifHint =
+        hints[result.pushError] ||
+        'Notifikasi aktif. Push belum siap — cek VAPID di Railway Variables.'
     }
   }
 
@@ -556,8 +570,8 @@
           pushEnabled = isPushSubscribedLocally()
           return subscribeToPush()
         })
-        .then((sub) => {
-          pushEnabled = !!sub
+        .then((result) => {
+          pushEnabled = !!result?.subscription
         })
         .catch(() => {})
     }

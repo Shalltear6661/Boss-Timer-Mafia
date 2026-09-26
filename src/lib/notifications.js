@@ -170,12 +170,14 @@ export async function enableNotificationsWithPush() {
 
   try {
     const { subscribeToPush, isPushSupported } = await import('./push.js')
-    if (!isPushSupported()) return { granted: true, push: false, sound }
-    const sub = await subscribeToPush()
-    return { granted: true, push: !!sub, sound }
+    if (!isPushSupported()) {
+      return { granted: true, push: false, sound, pushError: 'browser_unsupported' }
+    }
+    const { subscription, error } = await subscribeToPush()
+    return { granted: true, push: !!subscription, sound, pushError: error || '' }
   } catch (e) {
     console.warn('Push subscribe gagal:', e)
-    return { granted: true, push: false, sound }
+    return { granted: true, push: false, sound, pushError: 'subscribe_failed' }
   }
 }
 

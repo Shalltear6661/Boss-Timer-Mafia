@@ -61,13 +61,20 @@ export function isPushSubscribedLocally() {
 /**
  * Subscribe Web Push + simpan ke server (sheet PushSubs).
  * Panggil setelah Notification.permission === 'granted' (dari gesture user).
+ * @returns {Promise<{ subscription: PushSubscription | null, error: string }>}
  */
 export async function subscribeToPush() {
-  if (!isPushSupported()) return null
-  if (Notification.permission !== 'granted') return null
+  if (!isPushSupported()) {
+    return { subscription: null, error: 'browser_unsupported' }
+  }
+  if (Notification.permission !== 'granted') {
+    return { subscription: null, error: 'permission' }
+  }
 
   const reg = await registerServiceWorker()
-  if (!reg) return null
+  if (!reg) {
+    return { subscription: null, error: 'service_worker' }
+  }
 
   let subscription = await reg.pushManager.getSubscription()
 
@@ -75,7 +82,7 @@ export async function subscribeToPush() {
     const vapidKey = await getVapidPublicKey()
     if (!vapidKey) {
       console.warn('VAPID public key kosong — set VAPID_PUBLIC_KEY di env')
-      return null
+      return { subscription: null, error: 'vapid_missing' }
     }
     try {
       subscription = await reg.pushManager.subscribe({
@@ -84,7 +91,7 @@ export async function subscribeToPush() {
       })
     } catch (e) {
       console.warn('Gagal subscribe push:', e)
-      return null
+      return { subscription: null, error: 'subscribe_failed' }
     }
   }
 
@@ -101,15 +108,16 @@ export async function subscribeToPush() {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
       console.warn('Gagal sync subscription ke server:', data.error || res.status)
-      // Subscription browser ada, tapi server belum punya → push background tidak jalan
-      return null
+      const msg = String(data.error || '')
+      if (/vapid/i.test(msg)) return { subscription: null, error: 'vapid_missing' }
+      return { subscription: null, error: 'server_sync' }
     }
   } catch (e) {
     console.warn('Gagal sync subscription ke server:', e)
-    return null
+    return { subscription: null, error: 'server_sync' }
   }
 
-  return subscription
+  return { subscription, error: '' }
 }
 
 export async function unsubscribeFromPush() {
