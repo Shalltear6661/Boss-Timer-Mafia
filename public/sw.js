@@ -49,7 +49,8 @@ self.addEventListener('push', (event) => {
         includeUncontrolled: true,
       })
 
-      // Kabari tab terbuka: putar suara milestone / sync state
+      // Kabari tab terbuka (background): sync + suara jika lokal belum fire
+      // Tab focused: SW skip OS notif; suara dari push tetap via claim (dedupe di client)
       for (const client of windowClients) {
         try {
           client.postMessage({
@@ -57,6 +58,7 @@ self.addEventListener('push', (event) => {
             payload: data,
             milestone: data.milestone || '',
             bossName: data.bossName || '',
+            tag: data.tag || '',
           })
         } catch {
           /* ignore */

@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled, fetchUnsoldLoots } from './lib/spreadsheet.js'
-  import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
+  import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, claimFromPushTag, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
   import {
     getAuthConfig,
     fetchMe,
@@ -183,7 +183,7 @@
     ]
     let anyOk = false
     for (const [id, name] of samples) {
-      const ok = await playAlertSound(id, name)
+      const ok = await playAlertSound(id, name, { force: true })
       if (ok) anyOk = true
       // Tunggu clip selesai (file custom lebih panjang)
       const waitMs = id === '10' ? 4500 : id === '5' ? 8000 : 9000
@@ -605,17 +605,21 @@
     }
     window.addEventListener('pointerdown', unlockOnce)
 
-    // Web Push → tab terbuka: putar suara sesuai milestone
+    // Web Push → tab terbuka: putar suara sesuai milestone (skip jika sudah di-fire lokal)
     const onSwMessage = (event) => {
       if (event.data?.type === 'PLAY_ALERT_SOUND' || event.data?.type === 'PUSH_RECEIVED') {
+        const tag = event.data.payload?.tag || event.data.tag || ''
+        // Local timer sering sudah putar dulu — jangan putar lagi dari push
+        if (tag && !claimFromPushTag(tag)) return
+
         const milestone =
           event.data.milestone ||
           event.data.payload?.milestone ||
-          (String(event.data.payload?.tag || '').includes('-spawn')
+          (String(tag).endsWith('-spawn')
             ? 'spawn'
-            : String(event.data.payload?.tag || '').includes('-5')
+            : String(tag).endsWith('-5')
               ? '5'
-              : String(event.data.payload?.tag || '').includes('-10')
+              : String(tag).endsWith('-10')
                 ? '10'
                 : 'spawn')
         const bossName = event.data.bossName || event.data.payload?.bossName || ''

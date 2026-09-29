@@ -175,17 +175,52 @@ export function isAudioUnlocked() {
   return audioUnlocked
 }
 
+/** Debounce: cegah suara sama diputar 2x (local timer + push) */
+let lastPlayKey = ''
+let lastPlayAt = 0
+const PLAY_DEDUP_MS = 12_000
+
+/**
+ * Claim milestone dari tag push (`boss-{id}-{10|5|spawn}`).
+ * Return false jika sudah pernah di-fire (hindari double sound).
+ */
+export function claimFromPushTag(tag) {
+  const raw = String(tag || '')
+  const m = raw.match(/^boss-(.+)-(10|5|spawn)$/)
+  if (!m) return true
+  return tryClaimFire(m[1], m[2])
+}
+
 /**
  * Putar suara alert sesuai milestone.
  * @param {string} [milestoneId] '10' | '5' | 'spawn'
- * @param {string} [_bossName] nama boss (opsional, untuk log/TTS fallback)
+ * @param {string} [_bossName] nama boss (opsional)
+ * @param {{ force?: boolean }} [opts] force=true lewati dedupe (untuk Tes Suara)
  */
-export async function playAlertSound(milestoneId = 'spawn', _bossName = '') {
+export async function playAlertSound(milestoneId = 'spawn', _bossName = '', opts = {}) {
   await resumeAudioContext()
   try {
     if (!audioUnlocked) {
       const ok = await unlockAudio()
       if (!ok) return false
+    }
+
+    const key = String(milestoneId || 'spawn')
+    const now = Date.now()
+    if (!opts.force && key === lastPlayKey && now - lastPlayAt < PLAY_DEDUP_MS) {
+      return true
+    }
+    lastPlayKey = key
+    lastPlayAt = now
+
+    // Stop clip lain supaya tidak overlap
+    for (const a of audioCache.values()) {
+      try {
+        a.pause()
+        a.currentTime = 0
+      } catch {
+        /* ignore */
+      }
     }
 
     const cfg = MILESTONE_SOUNDS[milestoneId] || MILESTONE_SOUNDS.spawn
