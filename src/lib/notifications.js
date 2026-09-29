@@ -2,11 +2,39 @@ const NOTIFIED_KEY = 'boss-timer-notified-v1'
 const AUDIO_UNLOCK_KEY = 'boss-timer-audio-unlocked-v1'
 const ALERT_SOUND_URL = '/alert.mp3'
 
+/** Suara per milestone: notif10 / notif5 / spawn */
+const MILESTONE_SOUNDS = {
+  '10': {
+    soundUrl: '/notif10.wav',
+    tones: [
+      { freq: 660, dur: 0.18, gap: 0.08 },
+      { freq: 880, dur: 0.28, gap: 0 },
+    ],
+  },
+  '5': {
+    soundUrl: '/notif5.wav',
+    tones: [
+      { freq: 740, dur: 0.14, gap: 0.06 },
+      { freq: 740, dur: 0.14, gap: 0.06 },
+      { freq: 988, dur: 0.32, gap: 0 },
+    ],
+  },
+  spawn: {
+    soundUrl: '/spawn.wav',
+    tones: [
+      { freq: 523, dur: 0.12, gap: 0.05 },
+      { freq: 659, dur: 0.12, gap: 0.05 },
+      { freq: 784, dur: 0.12, gap: 0.05 },
+      { freq: 1046, dur: 0.45, gap: 0 },
+    ],
+  },
+}
+
 /** @type {Map<string, Set<string>>} */
 let notified = new Map()
 
-/** @type {HTMLAudioElement | null} */
-let alertAudio = null
+/** @type {Map<string, HTMLAudioElement>} */
+const audioCache = new Map()
 /** @type {AudioContext | null} */
 let audioCtx = null
 let audioUnlocked = false
@@ -47,34 +75,82 @@ function markAudioUnlocked() {
   }
 }
 
-function getAlertAudio() {
+function getAlertAudio(url = ALERT_SOUND_URL) {
   if (typeof Audio === 'undefined') return null
-  if (!alertAudio) {
-    alertAudio = new Audio(ALERT_SOUND_URL)
-    alertAudio.preload = 'auto'
-    alertAudio.volume = 1
+  let audio = audioCache.get(url)
+  if (!audio) {
+    audio = new Audio(url)
+    audio.preload = 'auto'
+    audio.volume = 1
     // iOS Safari: wajib agar play() tidak dianggap video fullscreen
-    alertAudio.setAttribute('playsinline', 'true')
-    alertAudio.playsInline = true
+    audio.setAttribute('playsinline', 'true')
+    audio.playsInline = true
+    audioCache.set(url, audio)
   }
-  return alertAudio
+  return audio
 }
 
 async function resumeAudioContext() {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext
-    if (!Ctx) return
+    if (!Ctx) return null
     if (!audioCtx) audioCtx = new Ctx()
     if (audioCtx.state === 'suspended') await audioCtx.resume()
+    return audioCtx
   } catch {
-    /* ignore */
+    return null
+  }
+}
+
+/** Nada sintetis berbeda per milestone (fallback jika file belum ada) */
+async function playToneSequence(tones) {
+  const ctx = await resumeAudioContext()
+  if (!ctx || !tones?.length) return false
+  try {
+    let t = ctx.currentTime + 0.02
+    for (const tone of tones) {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = tone.freq
+      gain.gain.setValueAtTime(0.0001, t)
+      gain.gain.exponentialRampToValueAtTime(0.35, t + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + tone.dur)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(t)
+      osc.stop(t + tone.dur + 0.02)
+      t += tone.dur + (tone.gap || 0)
+    }
+    await new Promise((r) => setTimeout(r, Math.ceil((t - ctx.currentTime) * 1000) + 40))
+    return true
+  } catch (e) {
+    console.warn('Gagal putar tone:', e)
+    return false
+  }
+}
+
+async function playMp3(url) {
+  const audio = getAlertAudio(url)
+  if (!audio) return false
+  try {
+    audio.pause()
+    audio.currentTime = 0
+    audio.muted = false
+    audio.volume = 1
+    await audio.play()
+    return true
+  } catch {
+    return false
   }
 }
 
 /** Unlock audio setelah gesture user (klik / tap) — wajib di Chrome/Safari */
 export async function unlockAudio() {
   await resumeAudioContext()
-  const audio = getAlertAudio()
+  // Unlock pakai notif10 (file utama); fallback alert.mp3
+  const unlockUrl = MILESTONE_SOUNDS['10'].soundUrl
+  const audio = getAlertAudio(unlockUrl) || getAlertAudio(ALERT_SOUND_URL)
   if (!audio) return false
   try {
     audio.muted = true
@@ -82,6 +158,11 @@ export async function unlockAudio() {
     audio.pause()
     audio.currentTime = 0
     audio.muted = false
+    // Preload semua suara milestone
+    for (const cfg of Object.values(MILESTONE_SOUNDS)) {
+      getAlertAudio(cfg.soundUrl)
+    }
+    getAlertAudio(ALERT_SOUND_URL)
     markAudioUnlocked()
     return true
   } catch (e) {
@@ -94,23 +175,29 @@ export function isAudioUnlocked() {
   return audioUnlocked
 }
 
-/** Putar suara alert custom */
-export async function playAlertSound() {
+/**
+ * Putar suara alert sesuai milestone.
+ * @param {string} [milestoneId] '10' | '5' | 'spawn'
+ * @param {string} [_bossName] nama boss (opsional, untuk log/TTS fallback)
+ */
+export async function playAlertSound(milestoneId = 'spawn', _bossName = '') {
   await resumeAudioContext()
-  const audio = getAlertAudio()
-  if (!audio) return false
   try {
     if (!audioUnlocked) {
       const ok = await unlockAudio()
       if (!ok) return false
     }
-    audio.pause()
-    audio.currentTime = 0
-    audio.muted = false
-    audio.volume = 1
-    await audio.play()
-    markAudioUnlocked()
-    return true
+
+    const cfg = MILESTONE_SOUNDS[milestoneId] || MILESTONE_SOUNDS.spawn
+    let played = await playMp3(cfg.soundUrl)
+    if (!played) {
+      // Fallback: tone sintetis, lalu alert.mp3 generik
+      played = await playToneSequence(cfg.tones)
+      if (!played) played = await playMp3(ALERT_SOUND_URL)
+    }
+
+    if (played) markAudioUnlocked()
+    return played
   } catch (e) {
     console.warn('Gagal putar suara notif:', e)
     audioUnlocked = false
@@ -236,13 +323,13 @@ const MILESTONES = [
     id: '10',
     match: (ms) => ms <= 10 * 60 * 1000 && ms > 5 * 60 * 1000,
     title: '10 menit lagi',
-    body: (name) => `${name} akan spawn dalam 10 menit`,
+    body: (name) => `${name} akan spawn 10 menit lagi`,
   },
   {
     id: '5',
     match: (ms) => ms <= 5 * 60 * 1000 && ms > 0,
     title: '5 menit lagi',
-    body: (name) => `${name} akan spawn dalam 5 menit`,
+    body: (name) => `${name} akan spawn 5 menit lagi`,
   },
   {
     id: 'spawn',
@@ -255,7 +342,7 @@ const MILESTONES = [
 
 /**
  * Cek daftar boss dan kirim notifikasi browser jika melewati milestone.
- * Suara custom (alert.mp3) diputar jika tab masih terbuka + audio sudah di-unlock.
+ * Suara berbeda per milestone (nada + ucapan) jika tab terbuka + audio unlocked.
  * @param {Array<{id: string, name: string, msLeft: number}>} items
  */
 export function checkAndNotify(items) {
@@ -264,8 +351,7 @@ export function checkAndNotify(items) {
 
     for (const m of MILESTONES) {
       if (m.match(item.msLeft) && tryClaimFire(item.id, m.id)) {
-        // Coba suara custom; jika gagal, biarkan notifikasi OS bunyi (silent: false)
-        playAlertSound().then((played) => {
+        playAlertSound(m.id, item.name).then((played) => {
           if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
           try {
             new Notification(m.title, {

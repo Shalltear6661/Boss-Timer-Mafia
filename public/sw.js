@@ -33,7 +33,13 @@ self.addEventListener('push', (event) => {
     silent: false,
     vibrate: data.vibrate || [300, 100, 300, 100, 500],
     requireInteraction: true,
-    data: { url: '/', playSound: true, tag: data.tag || 'boss-timer' },
+    data: {
+      url: '/',
+      playSound: true,
+      tag: data.tag || 'boss-timer',
+      milestone: data.milestone || '',
+      bossName: data.bossName || '',
+    },
   }
 
   event.waitUntil(
@@ -43,10 +49,15 @@ self.addEventListener('push', (event) => {
         includeUncontrolled: true,
       })
 
-      // Kabari tab terbuka: putar suara / sync state
+      // Kabari tab terbuka: putar suara milestone / sync state
       for (const client of windowClients) {
         try {
-          client.postMessage({ type: 'PUSH_RECEIVED', payload: data })
+          client.postMessage({
+            type: 'PUSH_RECEIVED',
+            payload: data,
+            milestone: data.milestone || '',
+            bossName: data.bossName || '',
+          })
         } catch {
           /* ignore */
         }

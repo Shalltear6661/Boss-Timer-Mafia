@@ -217,13 +217,13 @@ export const PUSH_MILESTONES = [
     // Window ~2 menit agar cron tiap menit tidak mudah miss
     match: (ms) => ms <= 10 * 60 * 1000 && ms > 8 * 60 * 1000,
     title: '10 menit lagi',
-    body: (name) => `${name} akan spawn dalam ~10 menit`,
+    body: (name) => `${name} akan spawn 10 menit lagi`,
   },
   {
     id: '5',
     match: (ms) => ms <= 5 * 60 * 1000 && ms > 3 * 60 * 1000,
     title: '5 menit lagi',
-    body: (name) => `${name} akan spawn dalam ~5 menit`,
+    body: (name) => `${name} akan spawn 5 menit lagi`,
   },
   {
     id: 'spawn',
@@ -250,7 +250,14 @@ export function collectDueNotifications(items) {
         title: m.title,
         body: m.body(item.name),
         tag,
-        vibrate: [300, 100, 300, 100, 500],
+        milestone: m.id,
+        bossName: item.name,
+        vibrate:
+          m.id === 'spawn'
+            ? [400, 80, 400, 80, 600]
+            : m.id === '5'
+              ? [250, 80, 250, 80, 250]
+              : [200, 100, 200],
       })
     }
   }

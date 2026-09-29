@@ -154,7 +154,7 @@
       notifHint =
         'Izin notifikasi diblokir browser. Buka gembok URL → Site settings → Notifications → Allow, lalu refresh.'
     } else if (result.granted && !result.sound) {
-      notifHint = 'Notifikasi aktif. Ketuk “Tes Suara” sekali agar alert.mp3 diizinkan browser.'
+      notifHint = 'Notifikasi aktif. Ketuk “Tes Suara” untuk dengar notif10 / notif5 / spawn.'
     } else if (result.granted && !result.push) {
       const hints = {
         vapid_missing:
@@ -175,10 +175,23 @@
   }
 
   async function onTestSoundClick() {
-    const ok = await playAlertSound()
-    soundReady = ok || isAudioUnlocked()
-    notifHint = ok
-      ? 'Suara OK. Alert akan bunyi saat tab terbuka.'
+    // Putar berurutan: notif10 → notif5 → spawn
+    const samples = [
+      ['10', 'Boss'],
+      ['5', 'Boss'],
+      ['spawn', 'Boss'],
+    ]
+    let anyOk = false
+    for (const [id, name] of samples) {
+      const ok = await playAlertSound(id, name)
+      if (ok) anyOk = true
+      // Tunggu clip selesai (file custom lebih panjang)
+      const waitMs = id === '10' ? 4500 : id === '5' ? 8000 : 9000
+      await new Promise((r) => setTimeout(r, waitMs))
+    }
+    soundReady = anyOk || isAudioUnlocked()
+    notifHint = anyOk
+      ? 'Suara OK: notif10 → notif5 → spawn.'
       : 'Gagal putar suara. Pastikan tab tidak di-mute dan izinkan Sound untuk situs ini.'
   }
 
@@ -592,10 +605,21 @@
     }
     window.addEventListener('pointerdown', unlockOnce)
 
-    // Web Push → tab terbuka: putar suara (notif OS ditahan jika tab focused)
+    // Web Push → tab terbuka: putar suara sesuai milestone
     const onSwMessage = (event) => {
       if (event.data?.type === 'PLAY_ALERT_SOUND' || event.data?.type === 'PUSH_RECEIVED') {
-        playAlertSound()
+        const milestone =
+          event.data.milestone ||
+          event.data.payload?.milestone ||
+          (String(event.data.payload?.tag || '').includes('-spawn')
+            ? 'spawn'
+            : String(event.data.payload?.tag || '').includes('-5')
+              ? '5'
+              : String(event.data.payload?.tag || '').includes('-10')
+                ? '10'
+                : 'spawn')
+        const bossName = event.data.bossName || event.data.payload?.bossName || ''
+        playAlertSound(milestone, bossName)
       }
     }
     if ('serviceWorker' in navigator) {
