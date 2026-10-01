@@ -31,7 +31,7 @@ const valuesCache = new Map()
 /** Map nama boss → nomor baris sheet (1-based) dari baca terakhir */
 const rowIndexCache = new Map()
 
-function normalizeTurn(turn) {
+export function normalizeTurn(turn) {
   const t = String(turn || '').trim().toLowerCase()
   if (t === 'mafia') return 'MAFIA'
   if (t === 'mafiax2' || t === 'mafia x2' || t === 'mafia-x2') return 'MAFIAx2'

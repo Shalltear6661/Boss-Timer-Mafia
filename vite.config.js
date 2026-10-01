@@ -18,6 +18,7 @@ import {
   listPushSubscriptions,
 } from './server/pushStore.js'
 import { loadWatchList, collectDueNotifications } from './server/bossSchedule.js'
+import { upsertCombatPower } from './server/combatPower.js'
 
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -278,6 +279,30 @@ function sheetsApiPlugin(env) {
       } catch (e) {
         console.error('[cron-push-proxy]', e)
         sendJson(res, 500, { error: e.message || 'Cron push gagal' })
+      }
+      return
+    }
+
+    if (url.startsWith('/api/combat-power') && req.method === 'POST') {
+      try {
+        const body = await readJsonBody(req)
+        const fakeReq = { headers: { cookie: req.headers.cookie || '' } }
+        const session = getSessionFromRequest(fakeReq, env)
+        const result = await upsertCombatPower(
+          {
+            guild: body.guild,
+            ingameName: body.ingameName,
+            combatPower: body.combatPower,
+            screenshotBase64: body.screenshotBase64,
+            screenshotMime: body.screenshotMime,
+            submittedBy: session?.email || body.email || '',
+          },
+          env
+        )
+        sendJson(res, 200, { ok: true, ...result })
+      } catch (e) {
+        console.error('[combat-power-proxy]', e)
+        sendJson(res, 400, { error: e.message || 'Gagal simpan combat power' })
       }
       return
     }

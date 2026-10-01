@@ -3,6 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled, fetchUnsoldLoots } from './lib/spreadsheet.js'
+  import { submitCombatPower } from './lib/combatPower.js'
   import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, claimFromPushTag, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
   import {
     getAuthConfig,
@@ -20,6 +21,8 @@
     formatTimeInZone,
     formatDateInZone,
     zonedTimeToUtc,
+    isUpdateCpWindowOpen,
+    SOURCE_TZ,
   } from './lib/timezone.js'
   import { categorizeLoot, LOOT_CATEGORIES } from './lib/lootCategory.js'
 
@@ -129,12 +132,22 @@
   let searchQuery = ''
   let searchOpen = false
   let searchInputEl
-  let mainTab = 'jadwal' // 'jadwal' | 'loot'
+  let mainTab = 'jadwal' // 'jadwal' | 'loot' | 'cp'
   let lootItems = []
   let lootLoading = false
   let lootError = ''
   /** @type {Record<string, boolean>} accordion terbuka per kategori (default: terbuka) */
   let lootAccordionOpen = {}
+  let cpGuild = 'MAFIA'
+  let cpName = ''
+  let cpPower = ''
+  let cpFile = null
+  let cpPreview = ''
+  let cpSubmitting = false
+  let cpMessage = ''
+  let cpError = ''
+  let cpDragOver = false
+  let cpFileInputEl
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
   let isMobile =
@@ -199,6 +212,11 @@
   $: displayTimeZone = tzOption.tz
   $: tzLabel = tzOption.short
   $: minimizedBossCount = isMobile ? MINIMIZED_BOSS_COUNT_MOBILE : MINIMIZED_BOSS_COUNT_DESKTOP
+  // Update CP: Jumat penuh (00–24) berdasarkan WIB agar sama untuk semua member
+  $: cpTabOpen = isUpdateCpWindowOpen(now, SOURCE_TZ)
+  $: if (!cpTabOpen && mainTab === 'cp') {
+    mainTab = 'jadwal'
+  }
 
   function loadTzId() {
     try {
@@ -339,9 +357,102 @@
   }
 
   function setMainTab(tab) {
+    if (tab === 'cp' && !isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
+      cpError = ''
+      notifHint = 'Update CP hanya dibuka hari Jumat (00:00–24:00 WIB).'
+      return
+    }
     mainTab = tab
     if (tab === 'loot' && lootItems.length === 0 && !lootLoading) {
       syncLoots()
+    }
+  }
+
+  function onCpFileChange(event) {
+    const file = event.currentTarget?.files?.[0] || null
+    applyCpFile(file)
+  }
+
+  function applyCpFile(file) {
+    cpFile = file
+    cpError = ''
+    cpMessage = ''
+    if (cpPreview) {
+      try {
+        URL.revokeObjectURL(cpPreview)
+      } catch {
+        /* ignore */
+      }
+    }
+    cpPreview = file ? URL.createObjectURL(file) : ''
+  }
+
+  function clearCpScreenshot() {
+    applyCpFile(null)
+  }
+
+  function onCpDrop(event) {
+    event.preventDefault()
+    cpDragOver = false
+    const file = event.dataTransfer?.files?.[0]
+    if (file) applyCpFile(file)
+  }
+
+  function formatCpInput(raw) {
+    const digits = String(raw || '').replace(/[^\d]/g, '')
+    if (!digits) return ''
+    return Number(digits).toLocaleString('id-ID')
+  }
+
+  function onCpPowerInput(event) {
+    const raw = event.currentTarget?.value || ''
+    cpPower = formatCpInput(raw)
+  }
+
+  function clearCpForm(keepGuild = true) {
+    if (!keepGuild) cpGuild = 'MAFIA'
+    cpName = ''
+    cpPower = ''
+    applyCpFile(null)
+  }
+
+  async function onCpSubmit() {
+    cpError = ''
+    cpMessage = ''
+    if (!cpGuild) {
+      cpError = 'Pilih guild'
+      return
+    }
+    if (!String(cpName).trim()) {
+      cpError = 'Nama wajib diisi'
+      return
+    }
+    const power = Number(String(cpPower).replace(/[^\d]/g, ''))
+    if (!Number.isFinite(power) || power <= 0) {
+      cpError = 'UpdateCP tidak valid'
+      return
+    }
+    // Screenshot sementara dinonaktifkan
+    // if (!cpFile) {
+    //   cpError = 'Screenshot equip wajib'
+    //   return
+    // }
+    cpSubmitting = true
+    try {
+      const result = await submitCombatPower({
+        guild: cpGuild,
+        ingameName: String(cpName).trim(),
+        combatPower: power,
+        // screenshotFile: cpFile,
+      })
+      cpMessage = result.updated
+        ? `${cpName.trim()} di-update → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
+        : `${cpName.trim()} ditambah → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
+      clearCpForm(true)
+    } catch (e) {
+      cpError = e.message || 'Gagal submit combat power'
+    } finally {
+      cpSubmitting = false
     }
   }
 
@@ -844,7 +955,24 @@
         <span class="app-tab-count">{lootItems.reduce((n, i) => n + (i.qty || 1), 0)}</span>
       {/if}
     </button>
+    <button
+      type="button"
+      class="app-tab"
+      class:active={mainTab === 'cp'}
+      class:locked={!cpTabOpen}
+      disabled={!cpTabOpen}
+      title={cpTabOpen ? 'Update Combat Power' : 'Hanya Jumat 00:00–24:00 WIB'}
+      on:click={() => setMainTab('cp')}
+    >
+      Update CP
+      {#if !cpTabOpen}
+        <span class="app-tab-lock">Jumat</span>
+      {/if}
+    </button>
   </nav>
+  {#if !cpTabOpen && mainTab !== 'cp'}
+    <p class="cp-window-note">Update CP dibuka setiap <strong>Jumat 00:00–24:00 WIB</strong>.</p>
+  {/if}
 
   {#if mainTab === 'jadwal'}
   <section>
@@ -936,7 +1064,7 @@
       </div>
     {/if}
   </section>
-  {:else}
+  {:else if mainTab === 'loot'}
   <section class="loot-section">
     <h2 class="section-title loot-title">Belum Terjual</h2>
     {#if lootLoading && lootItems.length === 0}
@@ -1001,6 +1129,147 @@
         {/each}
       </div>
     {/if}
+  </section>
+  {:else}
+  <section class="cp-section">
+    <h2 class="section-title cp-title">Update Combat Power</h2>
+
+    <div class="cp-shell">
+      <div class="cp-intro">
+        <p class="cp-intro-title">Update CP karakter</p>
+        <p class="cp-hint">
+          Sesuai sheet <strong>Update CP</strong>: kolom <strong>Nama</strong> &amp; <strong>UpdateCP</strong>.
+          Nama yang sudah ada akan di-update; yang baru ditambahkan. Tanggal <em>Last Update</em> ikut berubah.
+        </p>
+      </div>
+
+      <form class="cp-form" on:submit|preventDefault={onCpSubmit}>
+        <div class="cp-step">
+          <span class="cp-step-num">1</span>
+          <div class="cp-step-body">
+            <span class="cp-label">Guild</span>
+            <div class="cp-guild-toggle" role="group" aria-label="Pilih guild">
+              <button
+                type="button"
+                class="cp-guild-btn mafia"
+                class:active={cpGuild === 'MAFIA'}
+                aria-pressed={cpGuild === 'MAFIA'}
+                on:click={() => (cpGuild = 'MAFIA')}
+              >
+                <span class="cp-guild-dot"></span>
+                MAFIA
+              </button>
+              <button
+                type="button"
+                class="cp-guild-btn mafiax2"
+                class:active={cpGuild === 'MAFIAx2'}
+                aria-pressed={cpGuild === 'MAFIAx2'}
+                on:click={() => (cpGuild = 'MAFIAx2')}
+              >
+                <span class="cp-guild-dot"></span>
+                MAFIAx2
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cp-step">
+          <span class="cp-step-num">2</span>
+          <div class="cp-step-body cp-grid-2">
+            <label class="cp-field">
+              <span class="cp-label">Nama</span>
+              <input
+                type="text"
+                bind:value={cpName}
+                placeholder="Sesuai kolom Nama di sheet"
+                maxlength="40"
+                required
+                autocomplete="off"
+              />
+            </label>
+            <label class="cp-field">
+              <span class="cp-label">UpdateCP</span>
+              <div class="cp-power-wrap">
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  value={cpPower}
+                  on:input={onCpPowerInput}
+                  placeholder="151.165"
+                  required
+                  autocomplete="off"
+                />
+                <span class="cp-power-suffix">CP</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Screenshot equip sementara dinonaktifkan
+        <div class="cp-step">
+          <span class="cp-step-num">3</span>
+          <div class="cp-step-body">
+            <span class="cp-label">Screenshot Equip</span>
+            <input
+              bind:this={cpFileInputEl}
+              class="cp-file-native"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              on:change={onCpFileChange}
+            />
+            {#if !cpPreview}
+              <button
+                type="button"
+                class="cp-dropzone"
+                class:dragover={cpDragOver}
+                on:click={() => cpFileInputEl?.click()}
+                on:dragover|preventDefault={() => (cpDragOver = true)}
+                on:dragleave|preventDefault={() => (cpDragOver = false)}
+                on:drop={onCpDrop}
+              >
+                <span class="cp-drop-icon" aria-hidden="true">⬆</span>
+                <span class="cp-drop-title">Ketuk untuk upload</span>
+                <span class="cp-drop-sub">atau drag &amp; drop gambar equip di sini</span>
+                <span class="cp-drop-meta">JPG / PNG · otomatis dikompres</span>
+              </button>
+            {:else}
+              <div class="cp-preview-card">
+                <img class="cp-preview" src={cpPreview} alt="Preview screenshot equip" />
+                <div class="cp-preview-bar">
+                  <span class="cp-preview-name">{cpFile?.name || 'screenshot'}</span>
+                  <div class="cp-preview-actions">
+                    <button type="button" class="cp-preview-btn" on:click={() => cpFileInputEl?.click()}>
+                      Ganti
+                    </button>
+                    <button type="button" class="cp-preview-btn danger" on:click={clearCpScreenshot}>
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/if}
+          </div>
+        </div>
+        -->
+
+        {#if cpError}
+          <p class="cp-status error" role="alert">{cpError}</p>
+        {/if}
+        {#if cpMessage}
+          <p class="cp-status ok" role="status">{cpMessage}</p>
+        {/if}
+
+        <button type="submit" class="cp-submit" disabled={cpSubmitting}>
+          {#if cpSubmitting}
+            <span class="cp-spinner" aria-hidden="true"></span>
+            Menyimpan ke {cpGuild}…
+          {:else}
+            Simpan Combat Power
+          {/if}
+        </button>
+      </form>
+    </div>
   </section>
   {/if}
 
@@ -1575,10 +1844,385 @@
     border-color: rgba(34, 197, 94, 0.4);
     box-shadow: inset 0 1px 0 rgba(134, 239, 172, 0.15);
   }
+  .section-title.cp-title {
+    color: #fde68a;
+    background: linear-gradient(
+      135deg,
+      rgba(245, 158, 11, 0.24) 0%,
+      rgba(146, 64, 14, 0.12) 55%,
+      rgba(20, 20, 30, 0.4) 100%
+    );
+    border-color: rgba(245, 158, 11, 0.4);
+    box-shadow: inset 0 1px 0 rgba(253, 230, 138, 0.15);
+  }
+
+  .cp-shell {
+    position: relative;
+    border: 1px solid #2a2a38;
+    border-radius: 16px;
+    padding: 18px 16px 20px;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 0%, rgba(245, 158, 11, 0.1), transparent 55%),
+      linear-gradient(165deg, #171722 0%, #12121a 100%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    animation: cp-enter 0.35s ease-out;
+  }
+  @keyframes cp-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .cp-intro {
+    margin-bottom: 18px;
+  }
+  .cp-intro-title {
+    margin: 0 0 6px;
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #f5f0e6;
+  }
+  .cp-hint {
+    margin: 0;
+    font-size: 13px;
+    color: #9a9ab0;
+    line-height: 1.5;
+  }
+  .cp-hint strong {
+    color: #f0b428;
+    font-weight: 600;
+  }
+  .cp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cp-step {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 12px;
+    align-items: start;
+  }
+  .cp-step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f0f17;
+    background: linear-gradient(145deg, #f0b428, #d97706);
+    box-shadow: 0 0 12px rgba(240, 180, 40, 0.35);
+    margin-top: 2px;
+  }
+  .cp-step-body {
+    position: relative;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cp-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .cp-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a8a8bc;
+  }
+  .cp-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .cp-field input {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: #f0eef7;
+    background: #0e0e16;
+    border: 1px solid #2f2f40;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .cp-field input:focus {
+    outline: none;
+    border-color: rgba(240, 180, 40, 0.55);
+    box-shadow: 0 0 0 3px rgba(240, 180, 40, 0.12);
+  }
+  .cp-power-wrap {
+    position: relative;
+  }
+  .cp-power-wrap input {
+    width: 100%;
+    box-sizing: border-box;
+    padding-right: 48px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .cp-power-suffix {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #f0b428;
+    pointer-events: none;
+  }
+  .cp-guild-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .cp-guild-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid #2f2f40;
+    background: #0e0e16;
+    color: #8a8aa0;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+  }
+  .cp-guild-btn:hover {
+    color: #d8d8e6;
+    border-color: #3a3a4a;
+  }
+  .cp-guild-btn:active {
+    transform: scale(0.98);
+  }
+  .cp-guild-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #55556a;
+  }
+  .cp-guild-btn.mafia.active {
+    color: #dbeafe;
+    border-color: rgba(59, 130, 246, 0.55);
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.28), rgba(14, 14, 22, 0.95));
+    box-shadow: inset 0 1px 0 rgba(147, 197, 253, 0.2);
+  }
+  .cp-guild-btn.mafia.active .cp-guild-dot {
+    background: #60a5fa;
+    box-shadow: 0 0 8px rgba(96, 165, 250, 0.7);
+  }
+  .cp-guild-btn.mafiax2.active {
+    color: #f3e8ff;
+    border-color: rgba(168, 85, 247, 0.55);
+    background: linear-gradient(135deg, rgba(147, 51, 234, 0.28), rgba(14, 14, 22, 0.95));
+    box-shadow: inset 0 1px 0 rgba(216, 180, 254, 0.2);
+  }
+  .cp-guild-btn.mafiax2.active .cp-guild-dot {
+    background: #c084fc;
+    box-shadow: 0 0 8px rgba(192, 132, 252, 0.7);
+  }
+  .cp-file-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .cp-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    min-height: 148px;
+    padding: 20px 16px;
+    border-radius: 14px;
+    border: 1.5px dashed #3a3a4e;
+    background: rgba(14, 14, 22, 0.85);
+    color: #c8c8d8;
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  }
+  .cp-dropzone:hover,
+  .cp-dropzone.dragover {
+    border-color: rgba(240, 180, 40, 0.65);
+    background: rgba(240, 180, 40, 0.06);
+  }
+  .cp-dropzone.dragover {
+    transform: scale(1.01);
+  }
+  .cp-drop-icon {
+    font-size: 22px;
+    color: #f0b428;
+    margin-bottom: 4px;
+  }
+  .cp-drop-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f0eef7;
+  }
+  .cp-drop-sub {
+    font-size: 12px;
+    color: #8a8aa0;
+  }
+  .cp-drop-meta {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #6a6a80;
+  }
+  .cp-preview-card {
+    border: 1px solid #2f2f40;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #0a0a12;
+    animation: cp-enter 0.25s ease-out;
+  }
+  .cp-preview {
+    display: block;
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    background: #08080e;
+  }
+  .cp-preview-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-top: 1px solid #2a2a38;
+    background: #14141e;
+  }
+  .cp-preview-name {
+    min-width: 0;
+    font-size: 12px;
+    color: #9a9ab0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cp-preview-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .cp-preview-btn {
+    border: 1px solid #35354a;
+    border-radius: 8px;
+    background: #1a1a26;
+    color: #d8d8e6;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .cp-preview-btn:hover {
+    background: #222230;
+  }
+  .cp-preview-btn.danger {
+    color: #fca5a5;
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+  .cp-status {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .cp-status.error {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+  .cp-status.ok {
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+  .cp-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 50px;
+    margin-top: 2px;
+    border: 1px solid rgba(240, 180, 40, 0.5);
+    border-radius: 12px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(240, 180, 40, 0.35), rgba(180, 100, 20, 0.18) 45%, rgba(20, 20, 30, 0.95));
+    color: #fff7d6;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(240, 180, 40, 0.12);
+    transition: transform 0.12s ease, filter 0.15s ease;
+  }
+  .cp-submit:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+  .cp-submit:active:not(:disabled) {
+    transform: scale(0.985);
+  }
+  .cp-submit:disabled {
+    opacity: 0.65;
+    cursor: wait;
+  }
+  .cp-spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 247, 214, 0.25);
+    border-top-color: #fff7d6;
+    animation: cp-spin 0.7s linear infinite;
+  }
+  @keyframes cp-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 560px) {
+    .cp-grid-2 {
+      grid-template-columns: 1fr;
+    }
+    .cp-shell {
+      padding: 16px 12px 18px;
+    }
+  }
 
   .app-tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     margin-bottom: 14px;
   }
@@ -1607,6 +2251,33 @@
     color: #f0eef7;
     border-color: rgba(240, 180, 40, 0.45);
     background: linear-gradient(135deg, rgba(240, 180, 40, 0.18), rgba(20, 20, 30, 0.9));
+  }
+  .app-tab.locked,
+  .app-tab:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    color: #6a6a80;
+  }
+  .app-tab-lock {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.9;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    padding: 1px 6px;
+  }
+  .cp-window-note {
+    margin: -6px 0 12px;
+    font-size: 12px;
+    color: #8a8aa0;
+    text-align: center;
+  }
+  .cp-window-note strong {
+    color: #f0b428;
   }
   .app-tab-count {
     font-family: 'Inter', system-ui, sans-serif;

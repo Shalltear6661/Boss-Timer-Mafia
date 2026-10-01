@@ -16,6 +16,7 @@ import pushVapid from './api/push-vapid.js'
 import pushSubscribe from './api/push-subscribe.js'
 import pushNotify from './api/push-notify.js'
 import cronPush from './api/cron-push.js'
+import combatPower from './api/combat-power.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DIST = join(__dirname, 'dist')
@@ -74,6 +75,7 @@ const routes = [
   [/^\/api\/push-subscribe\/?$/, pushSubscribe],
   [/^\/api\/push-notify\/?$/, pushNotify],
   [/^\/api\/cron-push\/?$/, cronPush],
+  [/^\/api\/combat-power\/?$/, combatPower],
 ]
 
 function isInsideDist(resolved) {

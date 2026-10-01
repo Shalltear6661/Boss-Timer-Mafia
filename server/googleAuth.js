@@ -12,7 +12,10 @@ import crypto from 'node:crypto'
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const SA_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+const SA_SCOPE = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/drive.file',
+].join(' ')
 const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
 function b64url(input) {
