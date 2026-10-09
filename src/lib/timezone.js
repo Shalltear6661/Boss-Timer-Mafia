@@ -113,7 +113,7 @@ export function weekdayInZone(date, timeZone) {
   return getZonedParts(new Date(date), timeZone).weekday
 }
 
-/** Update CP hanya Jumat 00:00–24:00 di zona yang diberikan (default WIB). */
-export function isUpdateCpWindowOpen(date = new Date(), timeZone = SOURCE_TZ) {
-  return weekdayInZone(date, timeZone) === 5 // Friday
+/** Update CP dibuka (sementara tanpa batasan hari). */
+export function isUpdateCpWindowOpen(_date = new Date(), _timeZone = SOURCE_TZ) {
+  return true
 }

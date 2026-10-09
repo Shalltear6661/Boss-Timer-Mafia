@@ -136,8 +136,8 @@
   let lootItems = []
   let lootLoading = false
   let lootError = ''
-  /** @type {Record<string, boolean>} accordion terbuka per kategori (default: terbuka) */
-  let lootAccordionOpen = {}
+  /** @type {string|null} kategori id yang sedang dibuka detailnya (null = grid kategori) */
+  let lootDetailId = null
   let cpGuild = 'MAFIA'
   let cpName = ''
   let cpPower = ''
@@ -212,7 +212,7 @@
   $: displayTimeZone = tzOption.tz
   $: tzLabel = tzOption.short
   $: minimizedBossCount = isMobile ? MINIMIZED_BOSS_COUNT_MOBILE : MINIMIZED_BOSS_COUNT_DESKTOP
-  // Update CP: Jumat penuh (00–24) berdasarkan WIB agar sama untuk semua member
+  // Update CP: dibuka (sementara tanpa batasan Jumat)
   $: cpTabOpen = isUpdateCpWindowOpen(now, SOURCE_TZ)
   $: if (!cpTabOpen && mainTab === 'cp') {
     mainTab = 'jadwal'
@@ -340,6 +340,7 @@
 
   async function syncLoots() {
     if (lootLoading) return
+    lootDetailId = null
     lootLoading = true
     lootError = ''
     try {
@@ -359,7 +360,7 @@
   function setMainTab(tab) {
     if (tab === 'cp' && !isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
       cpError = ''
-      notifHint = 'Update CP hanya dibuka hari Jumat (00:00–24:00 WIB).'
+      notifHint = 'Update CP sedang ditutup.'
       return
     }
     mainTab = tab
@@ -648,14 +649,14 @@
       : bossesByTurn.reduce((n, [, bs]) => n + bs.length, 0) +
         weeklyTurnCards.reduce((n, g) => n + g.bosses.length, 0)
 
-  function toggleLootGroup(id) {
-    // default terbuka (undefined !== false); klik = tutup/buka
-    const currentlyOpen = lootAccordionOpen[id] !== false
-    lootAccordionOpen = {
-      ...lootAccordionOpen,
-      [id]: !currentlyOpen,
-    }
+  function openLootDetail(id) {
+    lootDetailId = id
   }
+  function closeLootDetail() {
+    lootDetailId = null
+  }
+
+  $: detailGroup = lootDetailId ? lootGroups.find((g) => g.id === lootDetailId) : null
 
   // Kirim notifikasi browser saat milestone 10m / 5m / spawn
   $: if (bosses.length) {
@@ -1079,53 +1080,47 @@
           Tidak ada barang belum terjual.
         {/if}
       </p>
+    {:else if lootDetailId && detailGroup}
+      <!-- === DETAIL VIEW === -->
+      <button type="button" class="loot-back" on:click={closeLootDetail}>← Kembali</button>
+      <p class="loot-meta">{detailGroup.qty} item · {detailGroup.label}</p>
+      <ul class="loot-grid-detail">
+        {#each detailGroup.items as item (item.id)}
+          <li
+            class="loot-detail-row"
+            class:mafia={item.turn === 'MAFIA'}
+            class:mafiax2={item.turn === 'MAFIAx2'}
+          >
+            <div class="loot-main">
+              <span class="loot-name">{item.name}</span>
+              {#if item.qty > 1}
+                <span class="loot-qty">×{item.qty}</span>
+              {/if}
+            </div>
+            <div class="loot-side">
+              {#if item.holder}
+                <span class="loot-holder">{item.holder}</span>
+              {/if}
+              <span
+                class="loot-turn"
+                class:mafia={item.turn === 'MAFIA'}
+                class:mafiax2={item.turn === 'MAFIAx2'}
+              >
+                {item.turn}
+              </span>
+            </div>
+          </li>
+        {/each}
+      </ul>
     {:else}
+      <!-- === GRID KATEGORI === -->
       <p class="loot-meta">{lootTotalQty} item · {lootGroups.length} kategori · MAFIA + MAFIAx2</p>
-      <div class="loot-accordions">
+      <div class="loot-grid">
         {#each lootGroups as group (group.id)}
-          {@const groupOpen = lootAccordionOpen[group.id] !== false}
-          <div class="loot-acc" class:open={groupOpen}>
-            <button
-              type="button"
-              class="loot-acc-head"
-              aria-expanded={groupOpen}
-              on:click={() => toggleLootGroup(group.id)}
-            >
-              <span class="loot-acc-chevron" aria-hidden="true">▸</span>
-              <span class="loot-acc-label">{group.label}</span>
-              <span class="loot-acc-count">{group.qty}</span>
-            </button>
-            {#if groupOpen}
-              <ul class="loot-list">
-                {#each group.items as item (item.id)}
-                  <li
-                    class="loot-row"
-                    class:mafia={item.turn === 'MAFIA'}
-                    class:mafiax2={item.turn === 'MAFIAx2'}
-                  >
-                    <div class="loot-main">
-                      <span class="loot-name">{item.name}</span>
-                      {#if item.qty > 1}
-                        <span class="loot-qty">×{item.qty}</span>
-                      {/if}
-                    </div>
-                    <div class="loot-side">
-                      {#if item.holder}
-                        <span class="loot-holder">{item.holder}</span>
-                      {/if}
-                      <span
-                        class="loot-turn"
-                        class:mafia={item.turn === 'MAFIA'}
-                        class:mafiax2={item.turn === 'MAFIAx2'}
-                      >
-                        {item.turn}
-                      </span>
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          </div>
+          <button type="button" class="loot-grid-card" on:click={() => openLootDetail(group.id)}>
+            <span class="loot-grid-card-label">{group.label}</span>
+            <span class="loot-grid-card-qty">{group.qty}</span>
+          </button>
         {/each}
       </div>
     {/if}
@@ -2298,67 +2293,72 @@
     font-size: 12px;
     color: #8a8aa0;
   }
-  .loot-accordions {
+
+  /* --- Grid Kategori --- */
+  .loot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+  }
+  .loot-grid-card {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-  }
-  .loot-acc {
-    border: 1px solid #2a2a38;
-    border-radius: 12px;
-    background: #14141e;
-    overflow: hidden;
-  }
-  .loot-acc-head {
-    width: 100%;
-    display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 11px 12px;
-    border: 0;
-    background: transparent;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 10px;
+    border-radius: 14px;
+    border: 1px solid #2a2a38;
+    background: #14141e;
     color: #f0eef7;
     cursor: pointer;
-    text-align: left;
     font-family: 'Cinzel', serif;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .loot-grid-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    border-color: #f0b428;
+  }
+  .loot-grid-card-label {
     font-size: 13px;
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
+    text-align: center;
   }
-  .loot-acc-head:hover {
-    background: rgba(255, 255, 255, 0.03);
-  }
-  .loot-acc-chevron {
+  .loot-grid-card-qty {
     display: inline-flex;
-    width: 1em;
-    color: #f0b428;
-    transition: transform 0.18s ease;
-    font-size: 12px;
-  }
-  .loot-acc.open .loot-acc-chevron {
-    transform: rotate(90deg);
-  }
-  .loot-acc-label {
-    flex: 1;
-    min-width: 0;
-  }
-  .loot-acc-count {
-    font-family: 'Inter', system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0;
-    text-transform: none;
-    color: #bbf7d0;
-    background: rgba(34, 197, 94, 0.12);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     border-radius: 999px;
-    padding: 2px 8px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #bbf7d0;
+    background: rgba(34, 197, 94, 0.15);
   }
-  .loot-acc .loot-list {
-    padding: 0 8px 8px;
+
+  /* --- Detail View --- */
+  .loot-back {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid #2a2a38;
+    background: transparent;
+    color: #8a8aa0;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 8px;
   }
-  .loot-list {
+  .loot-back:hover {
+    color: #f0eef7;
+    border-color: #f0b428;
+  }
+
+  .loot-grid-detail {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -2366,7 +2366,7 @@
     flex-direction: column;
     gap: 8px;
   }
-  .loot-row {
+  .loot-detail-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2377,11 +2377,11 @@
     border-left: 3px solid #35354a;
     background: #1a1a26;
   }
-  .loot-row.mafia {
+  .loot-detail-row.mafia {
     border-left-color: #3b82f6;
     background: rgba(37, 99, 235, 0.08);
   }
-  .loot-row.mafiax2 {
+  .loot-detail-row.mafiax2 {
     border-left-color: #a855f7;
     background: rgba(147, 51, 234, 0.1);
   }

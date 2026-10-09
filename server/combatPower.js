@@ -187,14 +187,15 @@ export async function upsertCombatPower(
     throw new Error('Guild harus MAFIA atau MAFIAx2')
   }
   if (!isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
-    throw new Error('Update CP hanya dibuka hari Jumat (00:00–24:00 WIB)')
+    throw new Error('Update CP sedang ditutup')
   }
   const name = String(ingameName || '').trim()
   if (!name) throw new Error('Nama wajib')
   const cp = Number(combatPower)
   if (!Number.isFinite(cp) || cp <= 0) throw new Error('Combat power tidak valid')
 
-  const cpDisplay = formatCpDisplay(cp)
+  const cpValue = Math.round(cp) // angka murni ke sheet (hindari '89.366 teks)
+  const cpDisplay = formatCpDisplay(cpValue)
   const { spreadsheetId, accessToken } = await ensureCombatPowerSheet(turn, env)
 
   // Baca B3:D (no | nama | CP) — baris 1-2 adalah meta/header
@@ -232,13 +233,13 @@ export async function upsertCombatPower(
   })
 
   if (foundRow > 0) {
-    // Update hanya kolom UpdateCP (D)
+    // Update hanya kolom UpdateCP (D) — kirim number, bukan string berformat
     const writeUrl =
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-      `/values/${encodeURIComponent(sheetA1(`D${foundRow}`))}?valueInputOption=RAW`
+      `/values/${encodeURIComponent(sheetA1(`D${foundRow}`))}?valueInputOption=USER_ENTERED`
     await sheetsFetch(writeUrl, accessToken, {
       method: 'PUT',
-      body: JSON.stringify({ values: [[cpDisplay]] }),
+      body: JSON.stringify({ values: [[cpValue]] }),
     })
     return {
       updated: true,
@@ -250,15 +251,15 @@ export async function upsertCombatPower(
     }
   }
 
-  // Append baris baru: B=no, C=nama, D=CP
+  // Append baris baru: B=no, C=nama, D=CP (CP sebagai angka)
   const nextNo = maxNo + 1
   const appendUrl =
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}` +
-    `/values/${encodeURIComponent(sheetA1('B:D'))}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`
+    `/values/${encodeURIComponent(sheetA1('B:D'))}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`
   await sheetsFetch(appendUrl, accessToken, {
     method: 'POST',
     body: JSON.stringify({
-      values: [[nextNo, name, cpDisplay]],
+      values: [[nextNo, name, cpValue]],
     }),
   })
 
