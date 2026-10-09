@@ -3,7 +3,7 @@
   import { initialBosses } from './lib/bossData.js'
   import { weeklyBosses as initialWeeklyBosses, nextSpawnFor } from './lib/weeklyBossData.js'
   import { fetchIntervalBosses, fetchWeeklyBosses, markBossKilled, fetchUnsoldLoots } from './lib/spreadsheet.js'
-  import { submitCombatPower } from './lib/combatPower.js'
+  // import { submitCombatPower } from './lib/combatPower.js'
   import { ensureNotificationPermission, checkAndNotify, unlockAudio, playAlertSound, claimFromPushTag, isNotificationGranted, enableNotificationsWithPush, getNotificationPermission, isAudioUnlocked } from './lib/notifications.js'
   import {
     getAuthConfig,
@@ -21,8 +21,8 @@
     formatTimeInZone,
     formatDateInZone,
     zonedTimeToUtc,
-    isUpdateCpWindowOpen,
-    SOURCE_TZ,
+    //   isUpdateCpWindowOpen,
+  //   SOURCE_TZ,
   } from './lib/timezone.js'
   import { categorizeLoot, LOOT_CATEGORIES } from './lib/lootCategory.js'
 
@@ -138,16 +138,16 @@
   let lootError = ''
   /** @type {string|null} kategori id yang sedang dibuka detailnya (null = grid kategori) */
   let lootDetailId = null
-  let cpGuild = 'MAFIA'
-  let cpName = ''
-  let cpPower = ''
-  let cpFile = null
-  let cpPreview = ''
-  let cpSubmitting = false
-  let cpMessage = ''
-  let cpError = ''
-  let cpDragOver = false
-  let cpFileInputEl
+  // let cpGuild = 'MAFIA'
+  // let cpName = ''
+  // let cpPower = ''
+  // let cpFile = null
+  // let cpPreview = ''
+  // let cpSubmitting = false
+  // let cpMessage = ''
+  // let cpError = ''
+  // let cpDragOver = false
+  // let cpFileInputEl
   let turnMinimized = loadTurnMinimized()
   let tzId = loadTzId()
   let isMobile =
@@ -212,11 +212,12 @@
   $: displayTimeZone = tzOption.tz
   $: tzLabel = tzOption.short
   $: minimizedBossCount = isMobile ? MINIMIZED_BOSS_COUNT_MOBILE : MINIMIZED_BOSS_COUNT_DESKTOP
-  // Update CP: dibuka (sementara tanpa batasan Jumat)
-  $: cpTabOpen = isUpdateCpWindowOpen(now, SOURCE_TZ)
-  $: if (!cpTabOpen && mainTab === 'cp') {
-    mainTab = 'jadwal'
-  }
+  // $: cpTabOpen = isUpdateCpWindowOpen(now, SOURCE_TZ)
+  // $: if (!cpTabOpen && mainTab === 'cp') {
+  //   mainTab = 'jadwal'
+  // }
+
+  let cpTabOpen = false
 
   function loadTzId() {
     try {
@@ -358,104 +359,104 @@
   }
 
   function setMainTab(tab) {
-    if (tab === 'cp' && !isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
-      cpError = ''
-      notifHint = 'Update CP sedang ditutup.'
-      return
-    }
+    // if (tab === 'cp' && !isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
+    //   cpError = ''
+    //   notifHint = 'Update CP sedang ditutup.'
+    //   return
+    // }
     mainTab = tab
     if (tab === 'loot' && lootItems.length === 0 && !lootLoading) {
       syncLoots()
     }
   }
 
-  function onCpFileChange(event) {
-    const file = event.currentTarget?.files?.[0] || null
-    applyCpFile(file)
-  }
+  // function onCpFileChange(event) {
+  //   const file = event.currentTarget?.files?.[0] || null
+  //   applyCpFile(file)
+  // }
 
-  function applyCpFile(file) {
-    cpFile = file
-    cpError = ''
-    cpMessage = ''
-    if (cpPreview) {
-      try {
-        URL.revokeObjectURL(cpPreview)
-      } catch {
-        /* ignore */
-      }
-    }
-    cpPreview = file ? URL.createObjectURL(file) : ''
-  }
+  // function applyCpFile(file) {
+  //   cpFile = file
+  //   cpError = ''
+  //   cpMessage = ''
+  //   if (cpPreview) {
+  //     try {
+  //       URL.revokeObjectURL(cpPreview)
+  //     } catch {
+  //       /* ignore */
+  //     }
+  //   }
+  //   cpPreview = file ? URL.createObjectURL(file) : ''
+  // }
 
-  function clearCpScreenshot() {
-    applyCpFile(null)
-  }
+  // function clearCpScreenshot() {
+  //   applyCpFile(null)
+  // }
 
-  function onCpDrop(event) {
-    event.preventDefault()
-    cpDragOver = false
-    const file = event.dataTransfer?.files?.[0]
-    if (file) applyCpFile(file)
-  }
+  // function onCpDrop(event) {
+  //   event.preventDefault()
+  //   cpDragOver = false
+  //   const file = event.dataTransfer?.files?.[0]
+  //   if (file) applyCpFile(file)
+  // }
 
-  function formatCpInput(raw) {
-    const digits = String(raw || '').replace(/[^\d]/g, '')
-    if (!digits) return ''
-    return Number(digits).toLocaleString('id-ID')
-  }
+  // function formatCpInput(raw) {
+  //   const digits = String(raw || '').replace(/[^\d]/g, '')
+  //   if (!digits) return ''
+  //   return Number(digits).toLocaleString('id-ID')
+  // }
 
-  function onCpPowerInput(event) {
-    const raw = event.currentTarget?.value || ''
-    cpPower = formatCpInput(raw)
-  }
+  // function onCpPowerInput(event) {
+  //   const raw = event.currentTarget?.value || ''
+  //   cpPower = formatCpInput(raw)
+  // }
 
-  function clearCpForm(keepGuild = true) {
-    if (!keepGuild) cpGuild = 'MAFIA'
-    cpName = ''
-    cpPower = ''
-    applyCpFile(null)
-  }
+  // function clearCpForm(keepGuild = true) {
+  //   if (!keepGuild) cpGuild = 'MAFIA'
+  //   cpName = ''
+  //   cpPower = ''
+  //   applyCpFile(null)
+  // }
 
-  async function onCpSubmit() {
-    cpError = ''
-    cpMessage = ''
-    if (!cpGuild) {
-      cpError = 'Pilih guild'
-      return
-    }
-    if (!String(cpName).trim()) {
-      cpError = 'Nama wajib diisi'
-      return
-    }
-    const power = Number(String(cpPower).replace(/[^\d]/g, ''))
-    if (!Number.isFinite(power) || power <= 0) {
-      cpError = 'UpdateCP tidak valid'
-      return
-    }
-    // Screenshot sementara dinonaktifkan
-    // if (!cpFile) {
-    //   cpError = 'Screenshot equip wajib'
-    //   return
-    // }
-    cpSubmitting = true
-    try {
-      const result = await submitCombatPower({
-        guild: cpGuild,
-        ingameName: String(cpName).trim(),
-        combatPower: power,
-        // screenshotFile: cpFile,
-      })
-      cpMessage = result.updated
-        ? `${cpName.trim()} di-update → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
-        : `${cpName.trim()} ditambah → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
-      clearCpForm(true)
-    } catch (e) {
-      cpError = e.message || 'Gagal submit combat power'
-    } finally {
-      cpSubmitting = false
-    }
-  }
+  // async function onCpSubmit() {
+  //   cpError = ''
+  //   cpMessage = ''
+  //   if (!cpGuild) {
+  //     cpError = 'Pilih guild'
+  //     return
+  //   }
+  //   if (!String(cpName).trim()) {
+  //     cpError = 'Nama wajib diisi'
+  //     return
+  //   }
+  //   const power = Number(String(cpPower).replace(/[^\d]/g, ''))
+  //   if (!Number.isFinite(power) || power <= 0) {
+  //     cpError = 'UpdateCP tidak valid'
+  //     return
+  //   }
+  //   // Screenshot sementara dinonaktifkan
+  //   // if (!cpFile) {
+  //   //   cpError = 'Screenshot equip wajib'
+  //   //   return
+  //   // }
+  //   cpSubmitting = true
+  //   try {
+  //     const result = await submitCombatPower({
+  //       guild: cpGuild,
+  //       ingameName: String(cpName).trim(),
+  //       combatPower: power,
+  //       // screenshotFile: cpFile,
+  //     })
+  //     cpMessage = result.updated
+  //       ? `${cpName.trim()} di-update → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
+  //       : `${cpName.trim()} ditambah → ${result.combatPower} CP (${cpGuild}). Last Update: ${result.lastUpdate}`
+  //     clearCpForm(true)
+  //   } catch (e) {
+  //     cpError = e.message || 'Gagal submit combat power'
+  //   } finally {
+  //     cpSubmitting = false
+  //   }
+  // }
 
   function load() {
     loadFromStorage()
@@ -956,7 +957,7 @@
         <span class="app-tab-count">{lootItems.reduce((n, i) => n + (i.qty || 1), 0)}</span>
       {/if}
     </button>
-    <button
+    <!-- <button
       type="button"
       class="app-tab"
       class:active={mainTab === 'cp'}
@@ -969,11 +970,11 @@
       {#if !cpTabOpen}
         <span class="app-tab-lock">Jumat</span>
       {/if}
-    </button>
+    </button> -->
   </nav>
-  {#if !cpTabOpen && mainTab !== 'cp'}
+  <!-- {#if !cpTabOpen && mainTab !== 'cp'}
     <p class="cp-window-note">Update CP dibuka setiap <strong>Jumat 00:00–24:00 WIB</strong>.</p>
-  {/if}
+  {/if} -->
 
   {#if mainTab === 'jadwal'}
   <section>
@@ -1124,147 +1125,6 @@
         {/each}
       </div>
     {/if}
-  </section>
-  {:else}
-  <section class="cp-section">
-    <h2 class="section-title cp-title">Update Combat Power</h2>
-
-    <div class="cp-shell">
-      <div class="cp-intro">
-        <p class="cp-intro-title">Update CP karakter</p>
-        <p class="cp-hint">
-          Sesuai sheet <strong>Update CP</strong>: kolom <strong>Nama</strong> &amp; <strong>UpdateCP</strong>.
-          Nama yang sudah ada akan di-update; yang baru ditambahkan. Tanggal <em>Last Update</em> ikut berubah.
-        </p>
-      </div>
-
-      <form class="cp-form" on:submit|preventDefault={onCpSubmit}>
-        <div class="cp-step">
-          <span class="cp-step-num">1</span>
-          <div class="cp-step-body">
-            <span class="cp-label">Guild</span>
-            <div class="cp-guild-toggle" role="group" aria-label="Pilih guild">
-              <button
-                type="button"
-                class="cp-guild-btn mafia"
-                class:active={cpGuild === 'MAFIA'}
-                aria-pressed={cpGuild === 'MAFIA'}
-                on:click={() => (cpGuild = 'MAFIA')}
-              >
-                <span class="cp-guild-dot"></span>
-                MAFIA
-              </button>
-              <button
-                type="button"
-                class="cp-guild-btn mafiax2"
-                class:active={cpGuild === 'MAFIAx2'}
-                aria-pressed={cpGuild === 'MAFIAx2'}
-                on:click={() => (cpGuild = 'MAFIAx2')}
-              >
-                <span class="cp-guild-dot"></span>
-                MAFIAx2
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="cp-step">
-          <span class="cp-step-num">2</span>
-          <div class="cp-step-body cp-grid-2">
-            <label class="cp-field">
-              <span class="cp-label">Nama</span>
-              <input
-                type="text"
-                bind:value={cpName}
-                placeholder="Sesuai kolom Nama di sheet"
-                maxlength="40"
-                required
-                autocomplete="off"
-              />
-            </label>
-            <label class="cp-field">
-              <span class="cp-label">UpdateCP</span>
-              <div class="cp-power-wrap">
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  value={cpPower}
-                  on:input={onCpPowerInput}
-                  placeholder="151.165"
-                  required
-                  autocomplete="off"
-                />
-                <span class="cp-power-suffix">CP</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <!-- Screenshot equip sementara dinonaktifkan
-        <div class="cp-step">
-          <span class="cp-step-num">3</span>
-          <div class="cp-step-body">
-            <span class="cp-label">Screenshot Equip</span>
-            <input
-              bind:this={cpFileInputEl}
-              class="cp-file-native"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              on:change={onCpFileChange}
-            />
-            {#if !cpPreview}
-              <button
-                type="button"
-                class="cp-dropzone"
-                class:dragover={cpDragOver}
-                on:click={() => cpFileInputEl?.click()}
-                on:dragover|preventDefault={() => (cpDragOver = true)}
-                on:dragleave|preventDefault={() => (cpDragOver = false)}
-                on:drop={onCpDrop}
-              >
-                <span class="cp-drop-icon" aria-hidden="true">⬆</span>
-                <span class="cp-drop-title">Ketuk untuk upload</span>
-                <span class="cp-drop-sub">atau drag &amp; drop gambar equip di sini</span>
-                <span class="cp-drop-meta">JPG / PNG · otomatis dikompres</span>
-              </button>
-            {:else}
-              <div class="cp-preview-card">
-                <img class="cp-preview" src={cpPreview} alt="Preview screenshot equip" />
-                <div class="cp-preview-bar">
-                  <span class="cp-preview-name">{cpFile?.name || 'screenshot'}</span>
-                  <div class="cp-preview-actions">
-                    <button type="button" class="cp-preview-btn" on:click={() => cpFileInputEl?.click()}>
-                      Ganti
-                    </button>
-                    <button type="button" class="cp-preview-btn danger" on:click={clearCpScreenshot}>
-                      Hapus
-                    </button>
-                  </div>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </div>
-        -->
-
-        {#if cpError}
-          <p class="cp-status error" role="alert">{cpError}</p>
-        {/if}
-        {#if cpMessage}
-          <p class="cp-status ok" role="status">{cpMessage}</p>
-        {/if}
-
-        <button type="submit" class="cp-submit" disabled={cpSubmitting}>
-          {#if cpSubmitting}
-            <span class="cp-spinner" aria-hidden="true"></span>
-            Menyimpan ke {cpGuild}…
-          {:else}
-            Simpan Combat Power
-          {/if}
-        </button>
-      </form>
-    </div>
   </section>
   {/if}
 
@@ -1839,7 +1699,7 @@
     border-color: rgba(34, 197, 94, 0.4);
     box-shadow: inset 0 1px 0 rgba(134, 239, 172, 0.15);
   }
-  .section-title.cp-title {
+  /* .section-title.cp-title {
     color: #fde68a;
     background: linear-gradient(
       135deg,
@@ -2273,7 +2133,7 @@
   }
   .cp-window-note strong {
     color: #f0b428;
-  }
+  } */
   .app-tab-count {
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 11px;
