@@ -18,7 +18,7 @@ const DEFAULT_SHEETS = {
     sheetName: 'Boss Timer M1',
   },
   INDOARMY: {
-    spreadsheetId: '1O0TW2vSGlqN9XkqP312NgzlrUTkLioWGpoHsVywjyHk',
+    spreadsheetId: '1bc_1yXtJWhl22_aqlFtWyvfreeDdw3fNZ9MuKHB-prY',
     sheetName: 'Boss Timer M2',
   },
 }
