@@ -1,7 +1,7 @@
 /**
  * GET /api/sheets?range=A2:H&turn=MAFIA
  *
- * Multi-sheet: parameter ?turn=MAFIA / MAFIAx2 untuk routing ke sheet berbeda.
+ * Multi-sheet: parameter ?turn=MAFIA / INDOARMY untuk routing ke sheet berbeda.
  * Jika turn tidak diisi, fallback ke config umum.
  */
 

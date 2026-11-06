@@ -63,7 +63,7 @@
   class:soon={isSoon}
   class:up={isUp}
   class:turn-mafia={turn === 'MAFIA'}
-  class:turn-mafiax2={turn === 'MAFIAx2'}
+  class:turn-mafiax2={turn === 'INDOARMY'}
 >
   <div class="head">
     <div class="head-left">

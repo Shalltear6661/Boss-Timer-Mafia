@@ -1,12 +1,12 @@
 // Boss dengan jadwal tetap mingguan (bukan berdasarkan interval/kematian).
 // day mengikuti Date.getDay(): 0=Minggu, 1=Senin, ..., 6=Sabtu
 // time "HH:mm" di zona sumber spreadsheet: Asia/Jakarta (WIB).
-// turn: MAFIA / MAFIAx2 / '' (tanpa turn)
+// turn: MAFIA / INDOARMY / '' (tanpa turn)
 
 import { nextOccurrenceInZone, SOURCE_TZ, weekdayInZone } from './timezone.js'
 
 export const weeklyBosses = [
-  { id: 'clemantis', name: 'Clemantis', turn: 'MAFIAx2', schedules: [{ day: 1, time: '10:30' }, { day: 4, time: '18:00' }] },
+  { id: 'clemantis', name: 'Clemantis', turn: 'INDOARMY', schedules: [{ day: 1, time: '10:30' }, { day: 4, time: '18:00' }] },
   { id: 'saphirus', name: 'Saphirus', turn: 'MAFIA', schedules: [{ day: 0, time: '16:00' }, { day: 2, time: '10:30' }] },
   { id: 'neutro', name: 'Neutro', turn: 'MAFIA', schedules: [{ day: 2, time: '18:00' }, { day: 4, time: '10:30' }] },
   { id: 'thymele', name: 'Thymele', turn: 'MAFIA', schedules: [{ day: 1, time: '18:00' }, { day: 3, time: '10:30' }] },

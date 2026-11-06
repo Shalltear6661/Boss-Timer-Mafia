@@ -183,8 +183,8 @@ export async function upsertCombatPower(
   env = process.env
 ) {
   const turn = normalizeTurn(guild)
-  if (turn !== 'MAFIA' && turn !== 'MAFIAx2') {
-    throw new Error('Guild harus MAFIA atau MAFIAx2')
+  if (turn !== 'MAFIA' && turn !== 'INDOARMY') {
+    throw new Error('Guild harus MAFIA atau INDOARMY')
   }
   if (!isUpdateCpWindowOpen(new Date(), SOURCE_TZ)) {
     throw new Error('Update CP sedang ditutup')

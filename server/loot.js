@@ -9,7 +9,7 @@ export { LOOT_CATEGORIES, categorizeLoot }
 /**
  * Parse kolom "Belum Terjual" dari sheet Loot.
  * MAFIA: No | Belum Terjual | Holder
- * MAFIAx2: No | Belum Terjual
+ * INDOARMY: No | Belum Terjual
  */
 export function parseUnsoldLoot(values, turn) {
   const rows = values || []

@@ -3,7 +3,7 @@
  *
  * Multi-sheet berdasarkan turn:
  * - MAFIA → sheet Boss Timer M1
- * - MAFIAx2 → sheet Boss Timer M2
+ * - INDOARMY → sheet Boss Timer M2
  *
  * Baca sheet prioritas: Service Account (bisa akses private) → fallback API Key.
  * Ada cache singkat agar tidak kena quota Read requests per minute.
@@ -17,13 +17,13 @@ const DEFAULT_SHEETS = {
     spreadsheetId: '16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI',
     sheetName: 'Boss Timer M1',
   },
-  MAFIAx2: {
+  INDOARMY: {
     spreadsheetId: '1O0TW2vSGlqN9XkqP312NgzlrUTkLioWGpoHsVywjyHk',
     sheetName: 'Boss Timer M2',
   },
 }
 
-const TURN_SHEETS = ['MAFIA', 'MAFIAx2']
+const TURN_SHEETS = ['MAFIA', 'INDOARMY']
 
 /** Cache baca sheet (per instance serverless) — kurangi quota Google */
 const CACHE_TTL_MS = 25_000
@@ -34,7 +34,7 @@ const rowIndexCache = new Map()
 export function normalizeTurn(turn) {
   const t = String(turn || '').trim().toLowerCase()
   if (t === 'mafia') return 'MAFIA'
-  if (t === 'mafiax2' || t === 'mafia x2' || t === 'mafia-x2') return 'MAFIAx2'
+  if (t === 'mafiax2' || t === 'mafia x2' || t === 'mafia-x2' || t === 'indoarmy') return 'INDOARMY'
   return ''
 }
 

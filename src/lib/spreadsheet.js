@@ -3,7 +3,7 @@
  * Browser Network tab akan melihat: /api/sheets?range=A2:H&turn=MAFIA
  * (tanpa API key Google)
  */
-const TURNS = ['MAFIA', 'MAFIAx2']
+const TURNS = ['MAFIA', 'INDOARMY']
 
 async function fetchRange(range, turn) {
   const res = await fetch(`/api/sheets?range=${encodeURIComponent(range)}&turn=${encodeURIComponent(turn)}`)

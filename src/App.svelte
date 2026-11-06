@@ -571,7 +571,7 @@
   function turnOrder(turn) {
     const t = normalizeTurn(turn)
     if (t === 'MAFIA') return 0
-    if (t === 'MAFIAx2') return 1
+    if (t === 'INDOARMY') return 1
     if (t === 'Tanpa Turn') return 99
     return 50
   }
@@ -602,7 +602,7 @@
     return nextSpawnFor(a, now).getTime() - nextSpawnFor(b, now).getTime()
   })
 
-  $: weeklyTurnCards = ['MAFIA', 'MAFIAx2']
+  $: weeklyTurnCards = ['MAFIA', 'INDOARMY']
     .map((turn) => ({
       turn,
       bosses: sortedWeeklyBosses.filter(
@@ -999,7 +999,7 @@
           <div
             class="turn-panel"
             class:mafia={turnLabel === 'MAFIA'}
-            class:mafiax2={turnLabel === 'MAFIAx2'}
+            class:mafiax2={turnLabel === 'INDOARMY'}
             class:noturn={turnLabel === 'Tanpa Turn'}
             class:minimized
           >
@@ -1044,7 +1044,7 @@
         {#if searching}
           Tidak ada boss mingguan yang cocok.
         {:else}
-          Tidak ada data boss mingguan MAFIA / MAFIAx2.
+          Tidak ada data boss mingguan MAFIA / INDOARMY.
         {/if}
       </p>
     {:else}
@@ -1090,7 +1090,7 @@
           <li
             class="loot-detail-row"
             class:mafia={item.turn === 'MAFIA'}
-            class:mafiax2={item.turn === 'MAFIAx2'}
+            class:mafiax2={item.turn === 'INDOARMY'}
           >
             <div class="loot-main">
               <span class="loot-name">{item.name}</span>
@@ -1105,7 +1105,7 @@
               <span
                 class="loot-turn"
                 class:mafia={item.turn === 'MAFIA'}
-                class:mafiax2={item.turn === 'MAFIAx2'}
+                class:mafiax2={item.turn === 'INDOARMY'}
               >
                 {item.turn}
               </span>
@@ -1115,7 +1115,7 @@
       </ul>
     {:else}
       <!-- === GRID KATEGORI === -->
-      <p class="loot-meta">{lootTotalQty} item · {lootGroups.length} kategori · MAFIA + MAFIAx2</p>
+      <p class="loot-meta">{lootTotalQty} item · {lootGroups.length} kategori · MAFIA + INDOARMY</p>
       <div class="loot-grid">
         {#each lootGroups as group (group.id)}
           <button type="button" class="loot-grid-card" on:click={() => openLootDetail(group.id)}>

@@ -1,5 +1,5 @@
 /**
- * GET /api/loots — barang belum terjual dari sheet Loot (MAFIA + MAFIAx2 digabung)
+ * GET /api/loots — barang belum terjual dari sheet Loot (MAFIA + INDOARMY digabung)
  */
 import { loadUnsoldLoots } from '../server/loot.js'
 

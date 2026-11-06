@@ -45,7 +45,7 @@
   class:soon={isSoon}
   class:up={isUp}
   class:turn-mafia={boss.turn === 'MAFIA'}
-  class:turn-mafiax2={boss.turn === 'MAFIAx2'}
+  class:turn-mafiax2={boss.turn === 'INDOARMY'}
 >
   <div class="row-main">
     <div class="identity">

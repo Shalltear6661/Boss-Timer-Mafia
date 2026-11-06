@@ -144,7 +144,7 @@ async function loadIntervalBosses(config, now, env) {
     const lastDeath = parseDeathDate(deathStr)
     if (!lastDeath || !interval) continue
     const slug = name.toLowerCase().replace(/\s+/g, '-')
-    // Sertakan turn agar boss sama di MAFIA & MAFIAx2 tidak bentrok / dobel tag
+    // Sertakan turn agar boss sama di MAFIA & INDOARMY tidak bentrok / dobel tag
     const id = `ib-${turn}-${slug}`
     const nextSpawn = lastDeath.getTime() + interval * 3600 * 1000
     items.push({ id, name, turn, msLeft: nextSpawn - now.getTime() })
@@ -153,7 +153,7 @@ async function loadIntervalBosses(config, now, env) {
   return items
 }
 
-/** Fetch weekly bosses — MAFIA mulai ~baris 25, MAFIAx2 mulai ~baris 17 */
+/** Fetch weekly bosses — MAFIA mulai ~baris 25, INDOARMY mulai ~baris 17 */
 async function loadWeeklyBosses(config, now, env) {
   const rows = await fetchSheetValues('A17:D', config.turn, env)
   const bossMap = {}

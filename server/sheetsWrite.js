@@ -20,7 +20,7 @@ export function formatDeathForSheet(date = new Date()) {
 
 /**
  * Update kolom Time of Death (D) untuk boss interval.
- * Parameter turn menentukan sheet tujuan (MAFIA / MAFIAx2).
+ * Parameter turn menentukan sheet tujuan (MAFIA / INDOARMY).
  * Menghindari baca ulang jika nomor baris masih ada di cache.
  * @returns {{ row: number, deathTime: string, name: string }}
  */
