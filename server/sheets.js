@@ -14,11 +14,11 @@ import { getAccessToken } from './googleAuth.js'
 /** Default hardcode — dipakai jika env turn-specific belum di-set */
 const DEFAULT_SHEETS = {
   MAFIA: {
-    spreadsheetId: '16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI',
+    spreadsheetId: '1CF_Mo0QdBBHsw9VtUePl1T_prMoIs19MFZKS6nxM_WQ',
     sheetName: 'Boss Timer M1',
   },
   INDOARMY: {
-    spreadsheetId: '1bc_1yXtJWhl22_aqlFtWyvfreeDdw3fNZ9MuKHB-prY',
+    spreadsheetId: '1CF_Mo0QdBBHsw9VtUePl1T_prMoIs19MFZKS6nxM_WQ',
     sheetName: 'Boss Timer M2',
   },
 }

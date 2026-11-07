@@ -35,7 +35,7 @@
   const MINIMIZED_BOSS_COUNT_DESKTOP = 2
   const MOBILE_MQ = '(max-width: 719px)'
   const SPREADSHEET_URL =
-    'https://docs.google.com/spreadsheets/d/16RuhOUl3XUXtWMkBeRZwgYBYdCoOH4w-zPUVyLqf3hI/edit?gid=1345093675#gid=1345093675'
+    'https://docs.google.com/spreadsheets/d/1CF_Mo0QdBBHsw9VtUePl1T_prMoIs19MFZKS6nxM_WQ/edit'
   // Service Account + share sheet sudah siap
   const ENABLE_MARK_KILLED = true
 
